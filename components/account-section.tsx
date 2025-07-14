@@ -2,9 +2,8 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { useTheme } from "next-themes"
@@ -21,10 +20,19 @@ import {
   ChevronRight,
   Loader2,
 } from "lucide-react"
-import { Input } from "@/components/ui/input"
 import AmericanFlag from "@/components/american-flag"
 
-export default function AccountSection() {
+export interface AccountSectionProps {
+  balance?: number
+  currency?: string
+  email?: string
+}
+
+export default function AccountSection({
+  balance = 0,
+  currency = "USD",
+  email = "guest@example.com",
+}: AccountSectionProps) {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [accountInfo, setAccountInfo] = useState<any>(null)
   const [balances, setBalances] = useState<any[]>([])
@@ -303,69 +311,16 @@ export default function AccountSection() {
   // Replace the return statement in the !isLoggedIn block with this token-based approach
   if (!isLoggedIn) {
     return (
-      <Card className={isDarkTheme ? "bg-[#131722] border-gray-800" : "bg-white"}>
+      <Card className="max-w-sm mx-auto">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <User className="h-5 w-5" />
-            Login to <span className="text-red-500">Deriv</span>
-          </CardTitle>
-          <CardDescription>Enter your Deriv API token to access your account</CardDescription>
+          <CardTitle>Login to Deriv</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <p className="text-sm">To get your API token:</p>
-              <ol className="list-decimal list-inside text-sm space-y-1">
-                <li>
-                  Log in to your Deriv account at{" "}
-                  <a
-                    href="https://app.deriv.com"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-500 hover:underline"
-                  >
-                    app.deriv.com
-                  </a>
-                </li>
-                <li>Go to Dashboard &gt; Security &amp; Limits &gt; API Token</li>
-                <li>Create a token with "Read", "Trade", "Payments" and "Admin" scopes</li>
-                <li>Copy and paste the token below</li>
-              </ol>
-            </div>
-
-            <Input
-              type="text"
-              placeholder="Enter your Deriv API token"
-              value={loginToken}
-              onChange={(e) => setLoginToken(e.target.value)}
-              className={`${isDarkTheme ? "bg-[#0E0F15] border-gray-700" : ""} text-black dark:text-white`}
-            />
-
-            {loginError && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Error</AlertTitle>
-                <AlertDescription>{loginError}</AlertDescription>
-              </Alert>
-            )}
-          </div>
+        <CardContent className="space-y-2 text-sm">
+          <p>
+            Balance: <strong>{balance.toFixed(2)}</strong> {currency}
+          </p>
+          <p>Email: {email}</p>
         </CardContent>
-        <CardFooter>
-          <Button
-            onClick={handleLogin}
-            disabled={isLoggingIn}
-            className="w-full bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600"
-          >
-            {isLoggingIn ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Logging in...
-              </>
-            ) : (
-              "Login"
-            )}
-          </Button>
-        </CardFooter>
       </Card>
     )
   }
@@ -376,7 +331,7 @@ export default function AccountSection() {
         <div className="flex justify-between items-center">
           <CardTitle className="flex items-center gap-2">
             <User className="h-5 w-5" />
-            My <span className="text-red-500">Deriv</span> Account
+            My Deriv Account
           </CardTitle>
           <Button variant="outline" size="sm" onClick={handleLogout}>
             <LogOut className="h-4 w-4 mr-2" />
@@ -457,7 +412,7 @@ export default function AccountSection() {
             <div className="grid grid-cols-2 gap-3">
               <Button
                 variant="outline"
-                className="flex items-center justify-center gap-2"
+                className="flex items-center justify-center gap-2 bg-transparent"
                 onClick={() => setActiveTab("deposit")}
               >
                 <ArrowDownLeft className="h-4 w-4" />
@@ -465,7 +420,7 @@ export default function AccountSection() {
               </Button>
               <Button
                 variant="outline"
-                className="flex items-center justify-center gap-2"
+                className="flex items-center justify-center gap-2 bg-transparent"
                 onClick={() => setActiveTab("trade")}
               >
                 <ArrowUpRight className="h-4 w-4" />
@@ -555,7 +510,7 @@ export default function AccountSection() {
                     <Button
                       key={index}
                       variant="outline"
-                      className="w-full justify-start gap-3 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all duration-300 transform hover:scale-[1.02]"
+                      className="w-full justify-start gap-3 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all duration-300 transform hover:scale-[1.02] bg-transparent"
                       onClick={() => {
                         // Show a success message instead of opening a new tab
                         alert("Deposit functionality is available in the full version. This is a demo.")

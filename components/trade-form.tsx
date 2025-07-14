@@ -1,12 +1,12 @@
 "use client"
 
-import type React from "react"
-
-import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+
+import type React from "react"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useState, useEffect } from "react"
 import { Slider } from "@/components/ui/slider"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
@@ -218,6 +218,16 @@ export default function TradeForm({ symbol, predictedDigit, tradingType }: Trade
     }
   }
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    // TODO: integrate with Deriv “purchase” call
+    alert(
+      `Place ${tradingType.toUpperCase()} trade on ${symbol}\nStake: ${amount}\nDuration: ${duration} ${durationUnit}\nPrediction: ${
+        barrier ?? "N/A"
+      }`,
+    )
+  }
+
   if (!isLoggedIn) {
     return (
       <Card className={isDarkTheme ? "bg-[#131722] border-gray-800" : "bg-white"}>
@@ -230,7 +240,7 @@ export default function TradeForm({ symbol, predictedDigit, tradingType }: Trade
             <AlertDescription>Please log in to your Deriv account to place trades</AlertDescription>
           </Alert>
           <Button
-            className="w-full"
+            className="w-full bg-transparent"
             variant="outline"
             onClick={() => {
               // Scroll to account section
@@ -350,16 +360,16 @@ export default function TradeForm({ symbol, predictedDigit, tradingType }: Trade
               onValueChange={(value) => setAmount(value[0].toString())}
             />
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" className="flex-1" onClick={() => setAmount("10")}>
+              <Button variant="outline" size="sm" className="flex-1 bg-transparent" onClick={() => setAmount("10")}>
                 10
               </Button>
-              <Button variant="outline" size="sm" className="flex-1" onClick={() => setAmount("25")}>
+              <Button variant="outline" size="sm" className="flex-1 bg-transparent" onClick={() => setAmount("25")}>
                 25
               </Button>
-              <Button variant="outline" size="sm" className="flex-1" onClick={() => setAmount("50")}>
+              <Button variant="outline" size="sm" className="flex-1 bg-transparent" onClick={() => setAmount("50")}>
                 50
               </Button>
-              <Button variant="outline" size="sm" className="flex-1" onClick={() => setAmount("100")}>
+              <Button variant="outline" size="sm" className="flex-1 bg-transparent" onClick={() => setAmount("100")}>
                 100
               </Button>
             </div>
@@ -400,6 +410,53 @@ export default function TradeForm({ symbol, predictedDigit, tradingType }: Trade
             <AlertDescription>{tradeError}</AlertDescription>
           </Alert>
         )}
+
+        {/* Quick Trade Form */}
+        <form onSubmit={handleSubmit} className="space-y-3 mt-4">
+          <div className="space-y-1">
+            <label className="text-xs font-medium">Stake</label>
+            <input
+              type="number"
+              min={0.35}
+              step={0.35}
+              value={amount}
+              onChange={(e) => setAmount(Number(e.target.value).toString())}
+              className="w-full rounded border px-2 py-1 text-sm"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs font-medium">Duration (seconds)</label>
+            <input
+              type="number"
+              min={5}
+              max={120}
+              value={duration}
+              onChange={(e) => setDuration(Number(e.target.value).toString())}
+              className="w-full rounded border px-2 py-1 text-sm"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs font-medium">Barrier / Prediction</label>
+            <Select defaultValue={predictedDigit?.toString() ?? "0"}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {[...Array(10)].map((_, i) => (
+                  <SelectItem key={i} value={i.toString()}>
+                    {i}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Button type="submit" className="w-full">
+            Purchase
+          </Button>
+        </form>
       </CardContent>
     </Card>
   )

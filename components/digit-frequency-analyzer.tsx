@@ -176,8 +176,20 @@ export function DigitFrequencyAnalyzer({ ticks }: DigitFrequencyAnalyzerProps) {
               </div>
             </div>
           </div>
+
+          {/* Updated Frequency Display */}
+          <div className="grid grid-cols-10 gap-1 text-center text-xs mt-6">
+            {analysis.digitCounts.map((c, i) => (
+              <div key={i} className="flex flex-col items-center">
+                <span className="font-medium">{i}</span>
+                <span>{c}</span>
+              </div>
+            ))}
+          </div>
         </CardContent>
       </Card>
     </div>
   )
 }
+
+export default DigitFrequencyAnalyzer

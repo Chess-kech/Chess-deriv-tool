@@ -5,10 +5,9 @@ import { useTheme } from "next-themes"
 
 interface SignalStrengthMeterProps {
   confidence: number
-  size?: number
 }
 
-export function SignalStrengthMeter({ confidence, size = 120 }: SignalStrengthMeterProps) {
+export function SignalStrengthMeter({ confidence }: SignalStrengthMeterProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const { theme } = useTheme()
 
@@ -22,6 +21,7 @@ export function SignalStrengthMeter({ confidence, size = 120 }: SignalStrengthMe
     const isDark = theme === "dark"
 
     // Set canvas size
+    const size = 120
     canvas.width = size * window.devicePixelRatio
     canvas.height = size * window.devicePixelRatio
     ctx.scale(window.devicePixelRatio, window.devicePixelRatio)
@@ -69,11 +69,14 @@ export function SignalStrengthMeter({ confidence, size = 120 }: SignalStrengthMe
     ctx.textAlign = "center"
     ctx.textBaseline = "middle"
     ctx.fillText(`${confidence}%`, centerX, centerY)
-  }, [confidence, size, theme])
+  }, [confidence, theme])
 
   return (
-    <div className="flex justify-center">
-      <canvas ref={canvasRef} width={size} height={size} style={{ width: size, height: size }} />
+    <div className="w-full h-2 rounded bg-muted">
+      <div
+        className={`h-full rounded ${confidence > 70 ? "bg-green-500" : confidence > 50 ? "bg-yellow-500" : "bg-red-500"}`}
+        style={{ width: `${confidence}%` }}
+      />
     </div>
   )
 }

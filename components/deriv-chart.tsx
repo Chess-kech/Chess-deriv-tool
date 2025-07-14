@@ -10,7 +10,7 @@ interface DerivChartProps {
   height?: number
 }
 
-export default function DerivChart({ symbol, height = 450 }: DerivChartProps) {
+export default function DerivChart({ symbol, height = 300 }: DerivChartProps) {
   const chartContainerRef = useRef<HTMLDivElement>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -204,7 +204,13 @@ export default function DerivChart({ symbol, height = 450 }: DerivChartProps) {
               <Skeleton className="h-[300px] w-full rounded-md" />
             </div>
           )}
-          <div ref={chartContainerRef} className={`w-full ${isLoading ? "hidden" : "block"}`} />
+          <div
+            ref={chartContainerRef}
+            className={`flex items-center justify-center rounded border border-dashed text-sm text-muted-foreground w-full ${isLoading ? "hidden" : "block"}`}
+            style={{ height }}
+          >
+            Deriv price chart for <strong>{symbol}</strong> (stub)
+          </div>
         </>
       )}
     </Card>

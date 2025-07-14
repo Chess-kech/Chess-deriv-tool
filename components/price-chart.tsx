@@ -6,13 +6,21 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useTheme } from "next-themes"
 import { cn } from "@/lib/utils"
 
-interface PriceChartProps {
+export interface PriceChartProps {
   symbol: string
-  data?: number[]
+  data: number[]
   height?: number
+  showGrid?: boolean
+  showTooltip?: boolean
 }
 
-export default function PriceChart({ symbol, data = [], height = 350 }: PriceChartProps) {
+export default function PriceChart({
+  symbol,
+  data = [],
+  height = 350,
+  showGrid = true,
+  showTooltip = true,
+}: PriceChartProps) {
   const chartRef = useRef<HTMLCanvasElement>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [priceHistory, setPriceHistory] = useState<number[]>([])
@@ -90,23 +98,25 @@ export default function PriceChart({ symbol, data = [], height = 350 }: PriceCha
     const range = max - min
 
     // Draw grid
-    ctx.strokeStyle = isDark ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.1)"
-    ctx.lineWidth = 0.5
+    if (showGrid) {
+      ctx.strokeStyle = isDark ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.1)"
+      ctx.lineWidth = 0.5
 
-    // Horizontal grid lines
-    for (let i = 0; i < 5; i++) {
-      const y = rect.height * (1 - i / 4)
-      ctx.beginPath()
-      ctx.moveTo(0, y)
-      ctx.lineTo(rect.width, y)
-      ctx.stroke()
+      // Horizontal grid lines
+      for (let i = 0; i < 5; i++) {
+        const y = rect.height * (1 - i / 4)
+        ctx.beginPath()
+        ctx.moveTo(0, y)
+        ctx.lineTo(rect.width, y)
+        ctx.stroke()
 
-      // Price labels
-      const price = min + (range * i) / 4
-      ctx.fillStyle = isDark ? "rgba(255, 255, 255, 0.6)" : "rgba(0, 0, 0, 0.6)"
-      ctx.font = "10px Arial"
-      ctx.textAlign = "left"
-      ctx.fillText(price.toFixed(2), 5, y - 5)
+        // Price labels
+        const price = min + (range * i) / 4
+        ctx.fillStyle = isDark ? "rgba(255, 255, 255, 0.6)" : "rgba(0, 0, 0, 0.6)"
+        ctx.font = "10px Arial"
+        ctx.textAlign = "left"
+        ctx.fillText(price.toFixed(2), 5, y - 5)
+      }
     }
 
     // Create gradient for line
@@ -168,7 +178,7 @@ export default function PriceChart({ symbol, data = [], height = 350 }: PriceCha
     ctx.font = "bold 14px Arial"
     ctx.textAlign = "left"
     ctx.fillText(symbol, 10, 20)
-  }, [priceHistory, isDark, theme])
+  }, [priceHistory, isDark, theme, showGrid])
 
   return (
     <Card
@@ -187,7 +197,7 @@ export default function PriceChart({ symbol, data = [], height = 350 }: PriceCha
           <canvas ref={chartRef} className="w-full h-full" style={{ height: `${height}px` }} />
 
           {/* Current price overlay */}
-          {currentPrice && (
+          {currentPrice && showTooltip && (
             <div
               className={cn(
                 "absolute top-4 right-4 px-4 py-2 rounded-lg font-mono text-xl font-bold transition-all duration-500",
