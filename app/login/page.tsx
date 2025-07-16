@@ -1,17 +1,17 @@
 "use client"
 
+import { CardFooter } from "@/components/ui/card"
 import type React from "react"
-
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/components/auth-provider"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ThemeProvider } from "@/components/theme-provider"
 import { useTheme } from "next-themes"
-import { Eye, EyeOff, AlertCircle, ArrowRight, Shield, DollarSign, Sparkles, TrendingUp, BarChart3 } from "lucide-react"
+import { Eye, EyeOff, User, Lock, DollarSign, Sparkles, TrendingUp, BarChart3 } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { TermsAndConditions } from "@/components/terms-and-conditions"
@@ -25,10 +25,10 @@ import {
 } from "@/components/ui/dialog"
 
 export default function LoginPage() {
+  const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
-  const [error, setError] = useState<string | null>(null)
   const [showPassword, setShowPassword] = useState(false)
-  const [mounted, setMounted] = useState(false)
+  const [error, setError] = useState("")
   const [agreedToTerms, setAgreedToTerms] = useState(false)
   const [showTermsError, setShowTermsError] = useState(false)
   const [termsOpen, setTermsOpen] = useState(false)
@@ -38,52 +38,30 @@ export default function LoginPage() {
   const router = useRouter()
   const { theme, setTheme } = useTheme()
 
-  // Handle hydration mismatch
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
-      router.push("/")
+      router.push("/analyzer")
     }
   }, [isAuthenticated, router])
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault()
-    setError(null)
-    setShowTermsError(false)
-
-    if (!password) {
-      setError("Please enter a password")
+    setError("") // Clear previous errors
+    if (!username || !password) {
+      setError("Please enter both username and password.")
       return
     }
 
-    if (!agreedToTerms) {
-      setShowTermsError(true)
-      return
+    const success = login(username, password)
+    if (!success) {
+      setError("Invalid username or password. Please try again.")
     }
-
-    setIsLoading(true)
-
-    // Add a slight delay to show the loading animation
-    setTimeout(() => {
-      const success = login(password)
-      if (!success) {
-        setError("Invalid password")
-        setIsLoading(false)
-      }
-    }, 800)
+    // Redirection is handled by AuthProvider on successful login
   }
 
-  const togglePasswordVisibility = () => {
-    setShowPassword(!showPassword)
+  const handleSignUpDeriv = () => {
+    window.open("https://hub.deriv.com/tradershub/signup?lang=en", "_blank")
   }
-
-  if (!mounted) return null
-
-  const isDarkTheme = theme === "dark"
 
   return (
     <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
@@ -96,7 +74,7 @@ export default function LoginPage() {
           <div className="absolute -bottom-8 left-20 w-72 h-72 bg-pink-500 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-4000"></div>
 
           {/* Grid pattern overlay */}
-          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iZ3JpZCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9OVXNlIj48cGF0aCBkPSJNIDQwIDAgTCAwIDAgMCA0MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMDUpIiBzdHJva2Utd2lkdGg9IjEiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjZ3JpZCkiLz48L3N2Zz4=')] opacity-20"></div>
+          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iZ3JpZCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9OVXNlIj48cGF0aCBkPSJNIDQwIDAgTCAwIDAgMCA0MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMDUpIiBzdHJva2Utd2lkdGg9IjEiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjZ3JpZCIvPjwvYXN2Zz4=')] opacity-20"></div>
         </div>
 
         {/* Main Content */}
@@ -143,7 +121,7 @@ export default function LoginPage() {
 
                 <div className="flex items-start space-x-4">
                   <div className="w-8 h-8 bg-pink-500/20 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <Shield className="h-4 w-4 text-pink-400" />
+                    <User className="h-4 w-4 text-pink-400" />
                   </div>
                   <div>
                     <h3 className="text-white font-bold text-lg">Secure Platform</h3>
@@ -190,15 +168,29 @@ export default function LoginPage() {
               <Card className="bg-white/10 backdrop-blur-xl border-white/20 shadow-2xl">
                 <CardHeader className="space-y-1 pb-6">
                   <CardTitle className="text-2xl font-bold text-white text-center">Welcome Back</CardTitle>
-                  <CardDescription className="text-center text-gray-300 font-medium">
-                    Enter your credentials to access the platform
-                  </CardDescription>
+                  <p className="text-center text-gray-300 font-medium">Access your Deriv Analysis Tool</p>
                 </CardHeader>
 
                 <CardContent className="space-y-4">
                   <form onSubmit={handleLogin} className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="password" className="text-white font-medium">
+                      <Label htmlFor="username" className="flex items-center gap-2 text-white font-medium">
+                        <User className="h-4 w-4" />
+                        Username
+                      </Label>
+                      <Input
+                        id="username"
+                        type="text"
+                        placeholder="Enter your username"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        className="bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus:border-purple-400 focus:ring-purple-400/20 h-12"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="password" className="flex items-center gap-2 text-white font-medium">
+                        <Lock className="h-4 w-4" />
                         Password
                       </Label>
                       <div className="relative">
@@ -209,14 +201,17 @@ export default function LoginPage() {
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
                           className="bg-white/10 border-white/20 text-white placeholder:text-gray-400 focus:border-purple-400 focus:ring-purple-400/20 h-12 pr-12"
+                          required
                         />
-                        <button
+                        <Button
                           type="button"
-                          onClick={togglePasswordVisibility}
+                          onClick={() => setShowPassword(!showPassword)}
                           className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-white transition-colors"
+                          variant="ghost"
+                          size="sm"
                         >
                           {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                        </button>
+                        </Button>
                       </div>
                     </div>
 
@@ -256,35 +251,9 @@ export default function LoginPage() {
 
                     {error && (
                       <Alert variant="destructive" className="bg-red-500/10 border-red-500/20 text-red-400">
-                        <AlertCircle className="h-4 w-4" />
                         <AlertDescription>{error}</AlertDescription>
                       </Alert>
                     )}
-
-                    {showTermsError && !error && (
-                      <Alert variant="destructive" className="bg-red-500/10 border-red-500/20 text-red-400">
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertDescription>You must agree to the terms and conditions</AlertDescription>
-                      </Alert>
-                    )}
-
-                    <Button
-                      type="submit"
-                      className="w-full h-12 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold text-lg transition-all duration-300 transform hover:scale-[1.02]"
-                      disabled={isLoading}
-                    >
-                      {isLoading ? (
-                        <div className="flex items-center justify-center">
-                          <div className="animate-spin h-5 w-5 mr-2 border-2 border-white border-t-transparent rounded-full"></div>
-                          <span>Signing In...</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-center">
-                          <span>Sign In</span>
-                          <ArrowRight className="h-5 w-5 ml-2" />
-                        </div>
-                      )}
-                    </Button>
                   </form>
                 </CardContent>
 
@@ -304,6 +273,15 @@ export default function LoginPage() {
                     className="w-full border-white/20 text-white hover:bg-white/10 font-medium"
                   >
                     Need Login Credentials?
+                  </Button>
+
+                  {/* Sign up Deriv Button */}
+                  <Button
+                    variant="outline"
+                    onClick={handleSignUpDeriv}
+                    className="w-full border-white/20 text-white hover:bg-white/10 font-medium bg-transparent"
+                  >
+                    Sign up Deriv
                   </Button>
 
                   {/* Theme Toggle */}
@@ -348,11 +326,7 @@ export default function LoginPage() {
           <div className="space-y-4"></div>
 
           <DialogFooter className="flex flex-col sm:flex-row gap-3">
-            <Button
-              variant="outline"
-              onClick={() => setContactDialogOpen(false)}
-              className="border-white/20 text-white hover:bg-white/10"
-            >
+            <Button variant="outline" className="w-full bg-transparent" onClick={() => setContactDialogOpen(false)}>
               Cancel
             </Button>
 
