@@ -1,7 +1,6 @@
 "use client"
 
-import type React from "react"
-import { createContext, useContext, useState, useEffect, useCallback } from "react"
+import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
 
 interface AuthContextType {
@@ -13,56 +12,43 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 const VALID_CREDENTIALS = [
-  { username: "user1", password: "pass1" },
-  { username: "user2", password: "pass2" },
+  { username: "user1", password: "password1" },
   { username: "admin", password: "adminpassword" },
+  { username: "test", password: "testpassword" },
 ]
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
 
   useEffect(() => {
-    const storedAuth = localStorage.getItem("deriv-auth")
-    if (storedAuth === "authenticated") {
+    const token = localStorage.getItem("auth_token")
+    if (token === "authenticated") {
       setIsAuthenticated(true)
     }
-    setIsLoading(false)
   }, [])
 
-  const login = useCallback(
-    (username: string, password: string) => {
-      const isValid = VALID_CREDENTIALS.some((cred) => cred.username === username && cred.password === password)
-      if (isValid) {
-        setIsAuthenticated(true)
-        localStorage.setItem("deriv-auth", "authenticated")
-        router.push("/analyzer") // Redirect to analyzer page on successful login
-        return true
-      }
-      return false
-    },
-    [router],
-  )
+  const login = (username: string, password: string) => {
+    const isValid = VALID_CREDENTIALS.some((cred) => cred.username === username && cred.password === password)
+    if (isValid) {
+      localStorage.setItem("auth_token", "authenticated")
+      setIsAuthenticated(true)
+      router.push("/analyzer") // Redirect to analyzer page on successful login
+      return true
+    }
+    return false
+  }
 
-  const logout = useCallback(() => {
+  const logout = () => {
+    localStorage.removeItem("auth_token")
     setIsAuthenticated(false)
-    localStorage.removeItem("deriv-auth")
-    router.push("/login") // Redirect to login page on logout
-  }, [router])
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    )
+    router.push("/login")
   }
 
   return <AuthContext.Provider value={{ isAuthenticated, login, logout }}>{children}</AuthContext.Provider>
 }
 
-export function useAuth() {
+export const useAuth = () => {
   const context = useContext(AuthContext)
   if (context === undefined) {
     throw new Error("useAuth must be used within an AuthProvider")

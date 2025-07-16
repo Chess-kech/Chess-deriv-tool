@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ThemeProvider } from "@/components/theme-provider"
 import { useTheme } from "next-themes"
-import { Eye, EyeOff, User, Lock, DollarSign, Sparkles, TrendingUp, BarChart3 } from "lucide-react"
+import { Eye, EyeOff, User, Lock, DollarSign, Sparkles, TrendingUp, BarChart3, ArrowRight } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { TermsAndConditions } from "@/components/terms-and-conditions"
@@ -38,6 +38,12 @@ export default function LoginPage() {
   const router = useRouter()
   const { theme, setTheme } = useTheme()
 
+  // Handle hydration mismatch
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   useEffect(() => {
     if (isAuthenticated) {
       router.push("/analyzer")
@@ -47,21 +53,35 @@ export default function LoginPage() {
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault()
     setError("") // Clear previous errors
+    setShowTermsError(false)
+
     if (!username || !password) {
       setError("Please enter both username and password.")
       return
     }
 
-    const success = login(username, password)
-    if (!success) {
-      setError("Invalid username or password. Please try again.")
+    if (!agreedToTerms) {
+      setShowTermsError(true)
+      return
     }
-    // Redirection is handled by AuthProvider on successful login
+
+    setIsLoading(true)
+
+    setTimeout(() => {
+      const success = login(username, password)
+      if (!success) {
+        setError("Invalid username or password. Please try again.")
+        setIsLoading(false)
+      }
+      // Redirection is handled by AuthProvider on successful login
+    }, 800)
   }
 
   const handleSignUpDeriv = () => {
     window.open("https://hub.deriv.com/tradershub/signup?lang=en", "_blank")
   }
+
+  if (!mounted) return null
 
   return (
     <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
@@ -74,7 +94,7 @@ export default function LoginPage() {
           <div className="absolute -bottom-8 left-20 w-72 h-72 bg-pink-500 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-4000"></div>
 
           {/* Grid pattern overlay */}
-          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iZ3JpZCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9OVXNlIj48cGF0aCBkPSJNIDQwIDAgTCAwIDAgMCA0MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMDUpIiBzdHJva2Utd2lkdGg9IjEiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjZ3JpZCIvPjwvYXN2Zz4=')] opacity-20"></div>
+          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iZ3JpZCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9OVXNlIj48cGF0aCBkPSJNIDQwIDAgTCAwIDAgMCA0MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMDUpIiBzdHJva2Utd2lkdGg9IjEiLz48L2x0dGVybiA+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjZ3JpZCIvPjwvYXN2Zz4=')] opacity-20"></div>
         </div>
 
         {/* Main Content */}
@@ -254,6 +274,29 @@ export default function LoginPage() {
                         <AlertDescription>{error}</AlertDescription>
                       </Alert>
                     )}
+                    {showTermsError && !error && (
+                      <Alert variant="destructive" className="bg-red-500/10 border-red-500/20 text-red-400">
+                        <AlertDescription>You must agree to the terms and conditions</AlertDescription>
+                      </Alert>
+                    )}
+
+                    <Button
+                      type="submit"
+                      className="w-full h-12 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold text-lg transition-all duration-300 transform hover:scale-[1.02]"
+                      disabled={isLoading}
+                    >
+                      {isLoading ? (
+                        <div className="flex items-center justify-center">
+                          <div className="animate-spin h-5 w-5 mr-2 border-2 border-white border-t-transparent rounded-full"></div>
+                          <span>Signing In...</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center">
+                          <span>Sign In</span>
+                          <ArrowRight className="h-5 w-5 ml-2" />
+                        </div>
+                      )}
+                    </Button>
                   </form>
                 </CardContent>
 
