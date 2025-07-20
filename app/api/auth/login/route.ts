@@ -4,7 +4,7 @@ import { NextResponse } from "next/server"
 const VALID_CREDENTIALS = [
   { username: "q", password: "Key" },
   { username: "dataPilot", password: "analysisPass#123" },
-  { username: "cryptoAce", password: "tradeMaster!456" },
+  { username: "dera", password: "tradeMaster!456" },
 ]
 
 export async function POST(request: Request) {
