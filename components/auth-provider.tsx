@@ -1,33 +1,36 @@
-"use client"
+'use client'
 
-import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
-import { useRouter } from "next/navigation"
+import React, { createContext, useContext, useState, useEffect } from 'react'
 
 interface AuthContextType {
   isAuthenticated: boolean
-  login: (username: string, password: string) => Promise<boolean> // Changed to return Promise<boolean>
+  login: (username: string, password: string) => Promise<boolean>
   logout: () => void
+  user: string | null
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-export const AuthProvider = ({ children }: { children: ReactNode }) => {
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const router = useRouter()
+  const [user, setUser] = useState<string | null>(null)
 
   useEffect(() => {
-    const token = localStorage.getItem("auth_token")
-    if (token === "authenticated") {
+    // Check if user is already logged in (from localStorage)
+    const savedAuth = localStorage.getItem('isAuthenticated')
+    const savedUser = localStorage.getItem('user')
+    if (savedAuth === 'true' && savedUser) {
       setIsAuthenticated(true)
+      setUser(savedUser)
     }
   }, [])
 
-  const login = async (username: string, password: string) => {
+  const login = async (username: string, password: string): Promise<boolean> => {
     try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({ username, password }),
       })
@@ -35,33 +38,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const data = await response.json()
 
       if (data.success) {
-        localStorage.setItem("auth_token", "authenticated")
         setIsAuthenticated(true)
-        router.push("/analyzer") // Redirect to analyzer page on successful login
+        setUser(username)
+        localStorage.setItem('isAuthenticated', 'true')
+        localStorage.setItem('user', username)
         return true
       } else {
-        // Authentication failed, but credentials are not exposed
         return false
       }
     } catch (error) {
-      console.error("Login API call failed:", error)
-      return false // Indicate login failure due to network or server error
+      console.error('Login error:', error)
+      return false
     }
   }
 
   const logout = () => {
-    localStorage.removeItem("auth_token")
     setIsAuthenticated(false)
-    router.push("/login")
+    setUser(null)
+    localStorage.removeItem('isAuthenticated')
+    localStorage.removeItem('user')
   }
 
-  return <AuthContext.Provider value={{ isAuthenticated, login, logout }}>{children}</AuthContext.Provider>
+  return (
+    <AuthContext.Provider value={{ isAuthenticated, login, logout, user }}>
+      {children}
+    </AuthContext.Provider>
+  )
 }
 
-export const useAuth = () => {
+export function useAuth() {
   const context = useContext(AuthContext)
   if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider")
+    throw new Error('useAuth must be used within an AuthProvider')
   }
   return context
 }

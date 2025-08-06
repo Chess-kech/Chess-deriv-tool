@@ -7,22 +7,16 @@ import { useRouter } from "next/navigation"
 import { useAuth } from "@/components/auth-provider"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ThemeProvider } from "@/components/theme-provider"
 import { useTheme } from "next-themes"
-import { Eye, EyeOff, User, Lock, DollarSign, Sparkles, TrendingUp, BarChart3, ArrowRight } from "lucide-react"
+import { Eye, EyeOff, User, Lock, DollarSign, Sparkles, TrendingUp, BarChart3, ArrowRight } from 'lucide-react'
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { TermsAndConditions } from "@/components/terms-and-conditions"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { toast } from 'sonner'
 
 export default function LoginPage() {
   const [username, setUsername] = useState("")
@@ -50,32 +44,23 @@ export default function LoginPage() {
     }
   }, [isAuthenticated, router])
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError("") // Clear previous errors
-    setShowTermsError(false)
-
-    if (!username || !password) {
-      setError("Please enter both username and password.")
-      return
-    }
-
-    if (!agreedToTerms) {
-      setShowTermsError(true)
-      return
-    }
-
     setIsLoading(true)
 
-    // Simulate network delay for better UX
-    await new Promise((resolve) => setTimeout(resolve, 800))
-
-    const success = await login(username, password)
-    if (!success) {
-      setError("Invalid username or password. Please try again.")
+    try {
+      const success = await login(username, password)
+      if (success) {
+        toast.success('Login successful!')
+        router.push('/')
+      } else {
+        toast.error('Invalid username or password')
+      }
+    } catch (error) {
+      toast.error('An error occurred during login')
+    } finally {
+      setIsLoading(false)
     }
-    setIsLoading(false)
-    // Redirection is handled by AuthProvider on successful login
   }
 
   const handleSignUpDeriv = () => {
@@ -193,7 +178,7 @@ export default function LoginPage() {
                 </CardHeader>
 
                 <CardContent className="space-y-4">
-                  <form onSubmit={handleLogin} className="space-y-4">
+                  <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="username" className="flex items-center gap-2 text-white font-medium">
                         <User className="h-4 w-4" />

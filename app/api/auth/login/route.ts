@@ -5,6 +5,8 @@ const VALID_CREDENTIALS = [
   { username: "q", password: "Key" },
   { username: "dataPilot2", password: "kitur" },
   { username: "dera", password: "tradeMaster!456" },
+  { username: "Richy", password: "richy1" },
+  { username: "mohamend", password: "moha1" },
 ]
 
 export async function POST(request: Request) {

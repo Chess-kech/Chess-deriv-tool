@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { Inter } from "next/font/google"
+import { Inter } from 'next/font/google'
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { AuthProvider } from "@/components/auth-provider"
@@ -17,28 +17,53 @@ export default function ClientLayout({
   children: React.ReactNode
 }>) {
   useEffect(() => {
-    // Disable right-click
-    const handleRightClick = (e: MouseEvent) => {
+    // Disable right-click context menu
+    const handleContextMenu = (e: MouseEvent) => {
       e.preventDefault()
+      return false
     }
-    document.addEventListener("contextmenu", handleRightClick)
 
-    // Disable common developer tool shortcuts (F12, Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+U)
+    // Disable common developer tools shortcuts
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (
-        e.key === "F12" ||
-        (e.ctrlKey && e.shiftKey && e.key === "I") ||
-        (e.ctrlKey && e.shiftKey && e.key === "J") ||
-        (e.ctrlKey && e.key === "u") // Ctrl+U for view-source
-      ) {
+      // Disable F12
+      if (e.key === 'F12') {
         e.preventDefault()
+        return false
+      }
+      
+      // Disable Ctrl+Shift+I (Developer Tools)
+      if (e.ctrlKey && e.shiftKey && e.key === 'I') {
+        e.preventDefault()
+        return false
+      }
+      
+      // Disable Ctrl+Shift+J (Console)
+      if (e.ctrlKey && e.shiftKey && e.key === 'J') {
+        e.preventDefault()
+        return false
+      }
+      
+      // Disable Ctrl+U (View Source)
+      if (e.ctrlKey && e.key === 'u') {
+        e.preventDefault()
+        return false
+      }
+      
+      // Disable Ctrl+Shift+C (Element Inspector)
+      if (e.ctrlKey && e.shiftKey && e.key === 'C') {
+        e.preventDefault()
+        return false
       }
     }
-    document.addEventListener("keydown", handleKeyDown)
 
+    // Add event listeners
+    document.addEventListener('contextmenu', handleContextMenu)
+    document.addEventListener('keydown', handleKeyDown)
+
+    // Cleanup event listeners
     return () => {
-      document.removeEventListener("contextmenu", handleRightClick)
-      document.removeEventListener("keydown", handleKeyDown)
+      document.removeEventListener('contextmenu', handleContextMenu)
+      document.removeEventListener('keydown', handleKeyDown)
     }
   }, [])
 
