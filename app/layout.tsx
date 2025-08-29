@@ -11,7 +11,7 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
   title: 'Deriv Analysis Tool',
   description: 'Advanced trading analysis and digit prediction tool for Deriv',
-    generator: 'v0.dev'
+    generator: 'v0.app'
 }
 
 export default function RootLayout({

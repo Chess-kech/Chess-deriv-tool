@@ -3,10 +3,10 @@ import { NextResponse } from "next/server"
 // Define the valid username and password combinations securely on the server
 const VALID_CREDENTIALS = [
   { username: "q", password: "Key" },
-  { username: "dataPilot2", password: "kitur" },
-  { username: "dera", password: "tradeMaster!456" },
-  { username: "Richy", password: "richy1" },
-  { username: "mohamend", password: "moha1" },
+  { username: "dataPilot2", password: "kitur1" },
+  { username: "dea", password: "tradeMaster!456" },
+  { username: "Ricy", password: "richy1" },
+  { username: "mohaend", password: "moha1" },
 ]
 
 export async function POST(request: Request) {
