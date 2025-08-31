@@ -5,7 +5,7 @@ const VALID_CREDENTIALS = [
   { username: "q", password: "Key" },
   { username: "dataPilot2", password: "kitur1" },
   { username: "dea", password: "tradeMaster!456" },
-  { username: "Ricy", password: "richy1" },
+  { username: "dot", password: "richy1" },
   { username: "mohaend", password: "moha1" },
 ]
 
