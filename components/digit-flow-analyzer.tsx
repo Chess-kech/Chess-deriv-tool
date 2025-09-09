@@ -57,12 +57,15 @@ const _0xKEYBLOCK = (e: KeyboardEvent) => {
   }
 }
 
-// Console protection
+// Console protection - safer version
 const _0xCONSOLE = () => {
   const noop = () => {}
   try {
+    // Only override specific methods, preserve others
+    const originalConsole = { ...console }
     Object.defineProperty(window, "console", {
       value: {
+        ...originalConsole,
         log: noop,
         warn: noop,
         error: noop,
@@ -73,6 +76,15 @@ const _0xCONSOLE = () => {
         table: noop,
         group: noop,
         groupEnd: noop,
+        // Preserve other console methods like timeStamp
+        timeStamp: originalConsole.timeStamp || noop,
+        time: originalConsole.time || noop,
+        timeEnd: originalConsole.timeEnd || noop,
+        count: originalConsole.count || noop,
+        countReset: originalConsole.countReset || noop,
+        assert: originalConsole.assert || noop,
+        dir: originalConsole.dir || noop,
+        dirxml: originalConsole.dirxml || noop,
       },
       writable: false,
       configurable: false,
