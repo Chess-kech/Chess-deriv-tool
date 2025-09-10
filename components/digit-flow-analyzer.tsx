@@ -119,13 +119,13 @@ const volatilitySymbols = {
   "1HZ250V": { name: "Volatility 250 (1s) Index", code: "250", speed: "1s", baseValue: 1387.92 },
 }
 
-const strategies = ["Matches", "Differs", "Even", "Odd", "Over", "Under"]
+const strategies = ["Matches", "Differs", "Even/Odd", "Over/Under"]
 
 export function DigitFlowAnalyzer() {
   const [currentValue, setCurrentValue] = useState("717.19")
   const [volatilitySymbol, setVolatilitySymbol] = useState("1HZ100V")
   const [volatilityName, setVolatilityName] = useState("Volatility 100 (1s) Index")
-  const [strategy, setStrategy] = useState("Matches/Differs")
+  const [strategy, setStrategy] = useState("Matches")
   const [isPredicting, setIsPredicting] = useState(false)
   const [predictedDigit, setPredictedDigit] = useState<number | null>(null)
   const [predictedRuns, setPredictedRuns] = useState<number | null>(null)
@@ -589,10 +589,11 @@ export function DigitFlowAnalyzer() {
     let confidence = 0
     let details = ""
 
-    if (strategy === "Even") {
-      // Even strategy analysis
+    if (strategy === "Even/Odd") {
+      // Even/Odd combined strategy analysis
       const evenCount = recentDigits.filter((d) => d % 2 === 0).length
       const evenPercentage = (evenCount / recentDigits.length) * 100
+      const oddPercentage = 100 - evenPercentage
 
       // Analyze streaks
       let currentStreak = 1
@@ -607,115 +608,75 @@ export function DigitFlowAnalyzer() {
         }
       }
 
-      // Decision logic for Even
+      // Decision logic for Even/Odd
       if (evenPercentage > 60) {
         recommendation = "Even"
         confidence = Math.min((evenPercentage - 50) * 2, 90)
         details = `Strong even bias (${evenPercentage.toFixed(1)}%). Continue with Even.`
+      } else if (oddPercentage > 60) {
+        recommendation = "Odd"
+        confidence = Math.min((oddPercentage - 50) * 2, 90)
+        details = `Strong odd bias (${oddPercentage.toFixed(1)}%). Continue with Odd.`
       } else if (evenPercentage < 40) {
         recommendation = "Even"
         confidence = Math.min((50 - evenPercentage) * 2.5, 85)
         details = `Even digits underrepresented (${evenPercentage.toFixed(1)}%). Correction expected.`
-      } else if (currentStreak >= 4 && !lastDigitIsEven) {
-        recommendation = "Even"
-        confidence = Math.min(currentStreak * 15, 80)
-        details = `Long odd streak (${currentStreak}). Even reversal expected.`
-      } else {
-        recommendation = "Even"
-        confidence = 55 + Math.abs(evenPercentage - 50)
-        details = `Moderate even trend (${evenPercentage.toFixed(1)}% even frequency).`
-      }
-    } else if (strategy === "Odd") {
-      // Odd strategy analysis
-      const evenCount = recentDigits.filter((d) => d % 2 === 0).length
-      const oddPercentage = ((recentDigits.length - evenCount) / recentDigits.length) * 100
-
-      // Analyze streaks
-      let currentStreak = 1
-      const lastDigitIsOdd = recentDigits[recentDigits.length - 1] % 2 === 1
-
-      for (let i = recentDigits.length - 2; i >= 0; i--) {
-        const digitIsOdd = recentDigits[i] % 2 === 1
-        if (digitIsOdd === lastDigitIsOdd) {
-          currentStreak++
-        } else {
-          break
-        }
-      }
-
-      // Decision logic for Odd
-      if (oddPercentage > 60) {
-        recommendation = "Odd"
-        confidence = Math.min((oddPercentage - 50) * 2, 90)
-        details = `Strong odd bias (${oddPercentage.toFixed(1)}%). Continue with Odd.`
       } else if (oddPercentage < 40) {
         recommendation = "Odd"
         confidence = Math.min((50 - oddPercentage) * 2.5, 85)
         details = `Odd digits underrepresented (${oddPercentage.toFixed(1)}%). Correction expected.`
-      } else if (currentStreak >= 4 && !lastDigitIsOdd) {
-        recommendation = "Odd"
+      } else if (currentStreak >= 4) {
+        recommendation = lastDigitIsEven ? "Odd" : "Even"
         confidence = Math.min(currentStreak * 15, 80)
-        details = `Long even streak (${currentStreak}). Odd reversal expected.`
+        details = `Long ${lastDigitIsEven ? "even" : "odd"} streak (${currentStreak}). ${lastDigitIsEven ? "Odd" : "Even"} reversal expected.`
       } else {
-        recommendation = "Odd"
-        confidence = 55 + Math.abs(oddPercentage - 50)
-        details = `Moderate odd trend (${oddPercentage.toFixed(1)}% odd frequency).`
+        recommendation = evenPercentage >= oddPercentage ? "Even" : "Odd"
+        confidence = 55 + Math.abs(evenPercentage - oddPercentage)
+        details = `Moderate ${recommendation.toLowerCase()} trend (${recommendation === "Even" ? evenPercentage.toFixed(1) : oddPercentage.toFixed(1)}% frequency).`
       }
-    } else if (strategy === "Over") {
-      // Over strategy analysis (digits 5-9)
+    } else if (strategy === "Over/Under") {
+      // Over/Under combined strategy analysis
       const overCount = recentDigits.filter((d) => d >= 5).length
       const overPercentage = (overCount / recentDigits.length) * 100
-
-      // Analyze recent momentum
-      const recent20 = recentDigits.slice(-20)
-      const recentOverCount = recent20.filter((d) => d >= 5).length
-      const momentum = (recentOverCount / 20) * 100
-
-      // Decision logic for Over
-      if (overPercentage > 60) {
-        recommendation = "Over"
-        confidence = Math.min((overPercentage - 50) * 2, 90)
-        details = `Strong over bias (${overPercentage.toFixed(1)}%). Continue with Over.`
-      } else if (overPercentage < 40) {
-        recommendation = "Over"
-        confidence = Math.min((50 - overPercentage) * 2.5, 85)
-        details = `Over digits underrepresented (${overPercentage.toFixed(1)}%). Correction expected.`
-      } else if (momentum > 70) {
-        recommendation = "Over"
-        confidence = Math.min(momentum + 10, 90)
-        details = `Strong recent over momentum (${momentum.toFixed(1)}%). Continue trend.`
-      } else {
-        recommendation = "Over"
-        confidence = 55 + Math.abs(overPercentage - 50)
-        details = `Moderate over trend (${overPercentage.toFixed(1)}% over frequency).`
-      }
-    } else if (strategy === "Under") {
-      // Under strategy analysis (digits 0-4)
       const underCount = recentDigits.filter((d) => d < 5).length
       const underPercentage = (underCount / recentDigits.length) * 100
 
       // Analyze recent momentum
       const recent20 = recentDigits.slice(-20)
+      const recentOverCount = recent20.filter((d) => d >= 5).length
       const recentUnderCount = recent20.filter((d) => d < 5).length
-      const momentum = (recentUnderCount / 20) * 100
+      const overMomentum = (recentOverCount / 20) * 100
+      const underMomentum = (recentUnderCount / 20) * 100
 
-      // Decision logic for Under
-      if (underPercentage > 60) {
+      // Decision logic for Over/Under
+      if (overPercentage > 60) {
+        recommendation = "Over"
+        confidence = Math.min((overPercentage - 50) * 2, 90)
+        details = `Strong over bias (${overPercentage.toFixed(1)}%). Continue with Over.`
+      } else if (underPercentage > 60) {
         recommendation = "Under"
         confidence = Math.min((underPercentage - 50) * 2, 90)
         details = `Strong under bias (${underPercentage.toFixed(1)}%). Continue with Under.`
+      } else if (overPercentage < 40) {
+        recommendation = "Over"
+        confidence = Math.min((50 - overPercentage) * 2.5, 85)
+        details = `Over digits underrepresented (${overPercentage.toFixed(1)}%). Correction expected.`
       } else if (underPercentage < 40) {
         recommendation = "Under"
         confidence = Math.min((50 - underPercentage) * 2.5, 85)
         details = `Under digits underrepresented (${underPercentage.toFixed(1)}%). Correction expected.`
-      } else if (momentum > 70) {
+      } else if (overMomentum > 70) {
+        recommendation = "Over"
+        confidence = Math.min(overMomentum + 10, 90)
+        details = `Strong recent over momentum (${overMomentum.toFixed(1)}%). Continue trend.`
+      } else if (underMomentum > 70) {
         recommendation = "Under"
-        confidence = Math.min(momentum + 10, 90)
-        details = `Strong recent under momentum (${momentum.toFixed(1)}%). Continue trend.`
+        confidence = Math.min(underMomentum + 10, 90)
+        details = `Strong recent under momentum (${underMomentum.toFixed(1)}%). Continue trend.`
       } else {
-        recommendation = "Under"
-        confidence = 55 + Math.abs(underPercentage - 50)
-        details = `Moderate under trend (${underPercentage.toFixed(1)}% under frequency).`
+        recommendation = overPercentage >= underPercentage ? "Over" : "Under"
+        confidence = 55 + Math.abs(overPercentage - underPercentage)
+        details = `Moderate ${recommendation.toLowerCase()} trend (${recommendation === "Over" ? overPercentage.toFixed(1) : underPercentage.toFixed(1)}% frequency).`
       }
     } else if (strategy === "Matches") {
       // Matches strategy analysis
@@ -799,9 +760,9 @@ export function DigitFlowAnalyzer() {
 
   // Get action text for trading
   const getActionText = (strategy: string, value: string | number): string => {
-    if (strategy === "Even" || strategy === "Odd") {
+    if (strategy === "Even/Odd") {
       return `TRADE ${strategy.toUpperCase()}`
-    } else if (strategy === "Over" || strategy === "Under") {
+    } else if (strategy === "Over/Under") {
       return `TRADE ${strategy.toUpperCase()}`
     } else if (strategy === "Matches") {
       return `TRADE MATCHES ${value}`
