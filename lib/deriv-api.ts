@@ -1,544 +1,410 @@
-// Deriv WebSocket API client
-export class DerivAPI {
-  private socket: WebSocket | null = null
-  private requestId = 1
-  private callbacks: Map<number, (response: any) => void> = new Map()
+class DerivAPI {
+  private ws: WebSocket | null = null
   private isConnected = false
   private reconnectAttempts = 0
   private maxReconnectAttempts = 5
-  private reconnectTimeout: NodeJS.Timeout | null = null
-  private onOpenCallbacks: (() => void)[] = []
-  private onCloseCallbacks: (() => void)[] = []
-  private onErrorCallbacks: ((error: any) => void)[] = []
-  private subscriptions: Map<string, number> = new Map()
-  private app_id = 1089 // Demo app_id for Deriv API
-  private hasLoggedFirstTick = false
-  private token: string | null = null
-  private accountInfo: any = null
-  private balances: any[] = [{ balance: 10000, currency: "USD" }]
-  private onLoginCallbacks: ((accountInfo: any) => void)[] = []
-  private onBalanceCallbacks: ((balances: any[]) => void)[] = []
-  private connectionState: "disconnected" | "connecting" | "connected" | "reconnecting" = "disconnected"
-  private isBrowser = typeof window !== "undefined"
+  private reconnectDelay = 2000
+  private subscriptions = new Map<string, (data: any) => void>()
+  private messageQueue: any[] = []
+  private pingInterval: NodeJS.Timeout | null = null
+  private connectionPromise: Promise<void> | null = null
+  private forceOffline = false
+
+  // Multiple endpoints for better reliability
+  private endpoints = [
+    "wss://ws.derivws.com/websockets/v3?app_id=1089",
+    "wss://ws.binaryws.com/websockets/v3?app_id=1089",
+  ]
+  private currentEndpointIndex = 0
+
+  // Event handlers
+  private onOpenHandler: (() => void) | null = null
+  private onCloseHandler: (() => void) | null = null
+  private onErrorHandler: ((error: any) => void) | null = null
+  private onLoginHandler: ((info: any) => void) | null = null
+  private onBalanceHandler: ((balance: any) => void) | null = null
 
   constructor() {
-    if (this.isBrowser) {
-      this.connect()
-      this.restoreSession()
-    }
+    this.connect()
   }
 
-  private connect() {
-    try {
-      if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-        console.log("Already connected to Deriv WebSocket API")
-        return
-      }
+  // Public event handler setters
+  onOpen(handler: () => void) {
+    this.onOpenHandler = handler
+  }
 
-      if (this.connectionState === "connecting") {
-        console.log("Already attempting to connect to Deriv WebSocket API")
-        return
-      }
+  onClose(handler: () => void) {
+    this.onCloseHandler = handler
+  }
 
-      this.connectionState = "connecting"
+  onError(handler: (error: any) => void) {
+    this.onErrorHandler = handler
+  }
 
-      if (this.socket) {
-        try {
-          this.socket.onopen = null
-          this.socket.onmessage = null
-          this.socket.onclose = null
-          this.socket.onerror = null
-          this.socket.close()
-        } catch (e) {
-          console.error("Error closing existing socket:", e)
-        }
-      }
+  onLogin(handler: (info: any) => void) {
+    this.onLoginHandler = handler
+  }
 
-      console.log("Attempting to connect to Deriv WebSocket API...")
+  onBalance(handler: (balance: any) => void) {
+    this.onBalanceHandler = handler
+  }
 
+  // Get connection status
+  getConnectionStatus(): boolean {
+    return this.isConnected && this.ws?.readyState === WebSocket.OPEN
+  }
+
+  // Force reconnection
+  async forceReconnect(): Promise<void> {
+    console.log("🔄 Forcing reconnection...")
+    this.disconnect()
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+    return this.connect()
+  }
+
+  // Connect to WebSocket
+  private async connect(): Promise<void> {
+    if (this.connectionPromise) {
+      return this.connectionPromise
+    }
+
+    this.connectionPromise = new Promise((resolve, reject) => {
       try {
-        this.socket = new WebSocket(`wss://ws.binaryws.com/websockets/v3?app_id=${this.app_id}`)
-      } catch (err) {
-        console.error("Error creating WebSocket:", err)
-        this.connectionState = "disconnected"
-        this.attemptReconnect()
-        return
-      }
+        const endpoint = this.endpoints[this.currentEndpointIndex]
+        console.log(`🔗 Connecting to Deriv API: ${endpoint}`)
 
-      const connectionTimeout = setTimeout(() => {
-        if (this.socket && this.socket.readyState !== WebSocket.OPEN) {
-          console.error("Connection timeout - closing socket and retrying")
-          if (this.socket) {
-            this.socket.close()
+        this.ws = new WebSocket(endpoint)
+
+        const connectionTimeout = setTimeout(() => {
+          console.log("⏰ Connection timeout")
+          this.ws?.close()
+          reject(new Error("Connection timeout"))
+        }, 10000)
+
+        this.ws.onopen = () => {
+          clearTimeout(connectionTimeout)
+          console.log("✅ Connected to Deriv API")
+          this.isConnected = true
+          this.reconnectAttempts = 0
+          this.currentEndpointIndex = 0 // Reset to primary endpoint
+
+          // Start ping mechanism
+          this.startPing()
+
+          // Process queued messages
+          this.processMessageQueue()
+
+          if (this.onOpenHandler) {
+            this.onOpenHandler()
           }
-          this.connectionState = "disconnected"
-          this.attemptReconnect()
+
+          resolve()
         }
-      }, 10000)
 
-      this.socket.onopen = () => {
-        clearTimeout(connectionTimeout)
-        console.log("✅ Successfully connected to Deriv WebSocket API")
-        this.isConnected = true
-        this.connectionState = "connected"
-        this.reconnectAttempts = 0
-        this.onOpenCallbacks.forEach((onOpen) => onOpen())
+        this.ws.onclose = (event) => {
+          clearTimeout(connectionTimeout)
+          console.log("❌ Disconnected from Deriv API", event.code, event.reason)
+          this.isConnected = false
+          this.stopPing()
 
-        this.send({ ping: 1 })
-          .then((response) => {
-            console.log("Ping response:", response)
-            if (this.token) {
-              this.authorize(this.token).catch((err) => {
-                console.error("Auto-authorization failed:", err)
-              })
-            }
-          })
-          .catch((error) => {
-            console.error("Ping failed:", error)
-          })
-      }
-
-      this.socket.onmessage = (msg) => {
-        try {
-          const response = JSON.parse(msg.data)
-
-          if (response.msg_type !== "tick" || !this.hasLoggedFirstTick) {
-            if (response.msg_type !== "ping" && response.msg_type !== "pong") {
-              console.log("Received response:", response)
-            }
-            if (response.msg_type === "tick") {
-              this.hasLoggedFirstTick = true
-            }
+          if (this.onCloseHandler) {
+            this.onCloseHandler()
           }
 
-          if (response.msg_type === "tick") {
-            const symbol = response.tick?.symbol
-            const requestId = this.subscriptions.get(symbol || "")
-            if (requestId && this.callbacks.has(requestId)) {
-              this.callbacks.get(requestId)?.(response)
-            }
-            return
+          // Auto-reconnect if not manually closed
+          if (!this.forceOffline && event.code !== 1000) {
+            this.scheduleReconnect()
           }
 
-          if (response.msg_type === "authorize") {
-            this.accountInfo = response.authorize
-            this.onLoginCallbacks.forEach((callback) => callback(this.accountInfo))
-            this.getAccountBalance().catch((err) => {
-              console.error("Failed to get account balance:", err)
-            })
-            return
-          }
-
-          if (response.msg_type === "balance") {
-            this.balances = [response.balance]
-            this.onBalanceCallbacks.forEach((callback) => callback(this.balances))
-            return
-          }
-
-          if (response.req_id && this.callbacks.has(response.req_id)) {
-            this.callbacks.get(response.req_id)?.(response)
-          }
-        } catch (error) {
-          console.error("Error parsing WebSocket message:", error)
+          this.connectionPromise = null
         }
-      }
 
-      this.socket.onclose = (event) => {
-        clearTimeout(connectionTimeout)
-        console.log(
-          `Disconnected from Deriv WebSocket API. Code: ${event.code}, Reason: ${event.reason || "No reason provided"}`,
-        )
-        this.isConnected = false
-        this.connectionState = "disconnected"
-        this.onCloseCallbacks.forEach((onClose) => onClose())
-        this.attemptReconnect()
-      }
+        this.ws.onerror = (error) => {
+          clearTimeout(connectionTimeout)
+          console.error("🔥 WebSocket error:", error)
 
-      this.socket.onerror = (error) => {
-        console.error("Deriv WebSocket API error:", error)
-        this.onErrorCallbacks.forEach((callback) => callback(error))
+          if (this.onErrorHandler) {
+            this.onErrorHandler(error)
+          }
+
+          reject(error)
+          this.connectionPromise = null
+        }
+
+        this.ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data)
+            this.handleMessage(data)
+          } catch (error) {
+            console.error("❌ Error parsing message:", error)
+          }
+        }
+      } catch (error) {
+        console.error("❌ Error creating WebSocket:", error)
+        reject(error)
+        this.connectionPromise = null
       }
-    } catch (error) {
-      console.error("Error connecting to Deriv WebSocket API:", error)
-      this.connectionState = "disconnected"
-      this.attemptReconnect()
-    }
+    })
+
+    return this.connectionPromise
   }
 
-  private attemptReconnect() {
+  // Schedule reconnection with exponential backoff
+  private scheduleReconnect() {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error(`Max reconnect attempts (${this.maxReconnectAttempts}) reached`)
+      console.log("❌ Max reconnection attempts reached")
       return
     }
 
-    this.reconnectAttempts++
-    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000)
+    const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts)
+    console.log(`🔄 Scheduling reconnect in ${delay}ms (attempt ${this.reconnectAttempts + 1})`)
 
-    console.log(
-      `Attempting to reconnect in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`,
-    )
+    setTimeout(() => {
+      this.reconnectAttempts++
 
-    if (this.reconnectTimeout) {
-      clearTimeout(this.reconnectTimeout)
-    }
+      // Try next endpoint if available
+      if (this.reconnectAttempts > 2) {
+        this.currentEndpointIndex = (this.currentEndpointIndex + 1) % this.endpoints.length
+      }
 
-    this.connectionState = "reconnecting"
-    this.reconnectTimeout = setTimeout(() => {
-      this.connect()
+      this.connect().catch((error) => {
+        console.error("❌ Reconnection failed:", error)
+      })
     }, delay)
   }
 
-  public onOpen(callback: () => void) {
-    this.onOpenCallbacks.push(callback)
-    if (this.isConnected) {
-      callback()
+  // Start ping mechanism
+  private startPing() {
+    this.pingInterval = setInterval(() => {
+      if (this.isConnected && this.ws?.readyState === WebSocket.OPEN) {
+        this.send({ ping: 1 })
+      }
+    }, 30000) // Ping every 30 seconds
+  }
+
+  // Stop ping mechanism
+  private stopPing() {
+    if (this.pingInterval) {
+      clearInterval(this.pingInterval)
+      this.pingInterval = null
     }
-    return this
   }
 
-  public onClose(callback: () => void) {
-    this.onCloseCallbacks.push(callback)
-    return this
-  }
-
-  public onError(callback: (error: any) => void) {
-    this.onErrorCallbacks.push(callback)
-    return this
-  }
-
-  public onLogin(callback: (accountInfo: any) => void) {
-    this.onLoginCallbacks.push(callback)
-    if (this.accountInfo) {
-      callback(this.accountInfo)
+  // Handle incoming messages
+  private handleMessage(data: any) {
+    // Handle pong
+    if (data.pong) {
+      return
     }
-    return this
-  }
 
-  public onBalance(callback: (balances: any[]) => void) {
-    this.onBalanceCallbacks.push(callback)
-    if (this.balances.length > 0) {
-      callback(this.balances)
+    // Handle tick data
+    if (data.tick) {
+      const callback = this.subscriptions.get(data.tick.symbol)
+      if (callback) {
+        callback(data)
+      }
+      return
     }
-    return this
+
+    // Handle authorization response
+    if (data.authorize) {
+      console.log("✅ Authorization successful")
+      if (this.onLoginHandler) {
+        this.onLoginHandler(data.authorize)
+      }
+      return
+    }
+
+    // Handle balance updates
+    if (data.balance) {
+      if (this.onBalanceHandler) {
+        this.onBalanceHandler([data.balance])
+      }
+      return
+    }
+
+    // Handle other responses
+    console.log("📨 Received message:", data)
   }
 
-  public send(request: any): Promise<any> {
+  // Send message
+  private send(message: any): Promise<any> {
     return new Promise((resolve, reject) => {
-      if (!this.socket) {
-        this.connect()
-        console.log("WebSocket not initialized, connecting...")
-
-        const connectionTimeout = setTimeout(() => {
-          reject(new Error("Connection attempt timed out"))
-        }, 10000)
-
-        const waitForConnection = () => {
-          if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-            clearTimeout(connectionTimeout)
-            this.send(request).then(resolve).catch(reject)
-          } else if (this.connectionState === "disconnected") {
-            clearTimeout(connectionTimeout)
-            reject(new Error("Failed to connect to Deriv WebSocket API"))
-          } else {
-            setTimeout(waitForConnection, 200)
-          }
-        }
-
-        waitForConnection()
+      if (!this.isConnected || this.ws?.readyState !== WebSocket.OPEN) {
+        // Queue message for later
+        this.messageQueue.push({ message, resolve, reject })
         return
       }
-
-      if (this.socket.readyState !== WebSocket.OPEN) {
-        console.log(`WebSocket not ready (state: ${this.socket.readyState}), waiting...`)
-
-        const maxWaitTime = 10000
-        const startTime = Date.now()
-
-        const checkConnection = () => {
-          if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-            this.send(request).then(resolve).catch(reject)
-            return
-          }
-
-          if (Date.now() - startTime > maxWaitTime) {
-            if (this.socket && this.socket.readyState === WebSocket.CONNECTING) {
-              setTimeout(checkConnection, 500)
-            } else {
-              this.disconnect()
-              this.connect()
-              reject(new Error("WebSocket connection timed out, attempting to reconnect"))
-            }
-            return
-          }
-
-          setTimeout(checkConnection, 300)
-        }
-
-        checkConnection()
-        return
-      }
-
-      const id = this.requestId++
-      request.req_id = id
-
-      const timeoutId = setTimeout(() => {
-        if (this.callbacks.has(id)) {
-          this.callbacks.delete(id)
-          reject(new Error("Request timed out"))
-        }
-      }, 30000)
-
-      this.callbacks.set(id, (response) => {
-        clearTimeout(timeoutId)
-        if (response.error) {
-          console.error("API error:", response.error)
-          reject(response)
-        } else {
-          resolve(response)
-        }
-        this.callbacks.delete(id)
-      })
 
       try {
-        this.socket.send(JSON.stringify(request))
+        this.ws.send(JSON.stringify(message))
+        resolve(message)
       } catch (error) {
-        clearTimeout(timeoutId)
-        console.error("Error sending WebSocket message:", error)
-        this.callbacks.delete(id)
         reject(error)
       }
     })
   }
 
-  public async subscribeTicks(symbol: string, callback: (tick: any) => void): Promise<number> {
-    try {
-      if (this.subscriptions.has(symbol)) {
-        const existingId = this.subscriptions.get(symbol) || 0
-        return existingId
-      }
-
-      if (!this.isConnected) {
-        console.log("Not connected, attempting to connect before subscribing to ticks")
-        await new Promise<void>((resolve) => {
-          const onOpenHandler = () => {
-            this.onOpenCallbacks = this.onOpenCallbacks.filter((cb) => cb !== onOpenHandler)
-            resolve()
-          }
-          this.onOpenCallbacks.push(onOpenHandler)
-          this.connect()
-        })
-      }
-
-      const id = this.requestId++
-      this.callbacks.set(id, callback)
-      this.subscriptions.set(symbol, id)
-
-      const request = {
-        ticks: symbol,
-        subscribe: 1,
-        req_id: id,
-      }
-
-      if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
-        throw new Error("WebSocket is not connected")
-      }
-
-      this.socket.send(JSON.stringify(request))
-      return id
-    } catch (error) {
-      console.error("Error subscribing to ticks:", error)
-      throw error
+  // Process queued messages
+  private processMessageQueue() {
+    while (this.messageQueue.length > 0) {
+      const { message, resolve, reject } = this.messageQueue.shift()
+      this.send(message).then(resolve).catch(reject)
     }
   }
 
-  public unsubscribeTicks(symbol: string) {
-    if (!this.subscriptions.has(symbol)) return
-
-    const id = this.subscriptions.get(symbol)
-    if (id) {
-      this.callbacks.delete(id)
-      this.subscriptions.delete(symbol)
-
-      if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-        const request = {
-          forget: id,
-        }
-        this.socket.send(JSON.stringify(request))
-      }
-    }
-  }
-
-  public async getServerTime(): Promise<any> {
-    return this.send({
-      time: 1,
-    })
-  }
-
-  public async getTradableAssets(): Promise<any> {
-    return this.send({
-      active_symbols: "brief",
-      product_type: "basic",
-    })
-  }
-
-  public async getTickHistory(symbol: string, count = 500, style = "ticks", endTime = "latest"): Promise<any> {
-    return this.send({
+  // Get tick history
+  async getTickHistory(symbol: string, count = 1000): Promise<any> {
+    const message = {
       ticks_history: symbol,
+      adjust_start_time: 1,
       count: count,
-      end: endTime,
-      style: style,
-    })
-  }
-
-  public async getDiagnosticInfo(): Promise<any> {
-    const info: any = {
-      connected: this.isConnected,
-      connectionState: this.connectionState,
-      reconnectAttempts: this.reconnectAttempts,
-      subscriptions: Array.from(this.subscriptions.keys()),
-      timestamp: new Date().toISOString(),
-      isLoggedIn: !!this.token,
-      socketState: this.socket ? this.socket.readyState : "no socket",
+      end: "latest",
+      start: 1,
+      style: "ticks",
     }
 
     try {
-      if (this.isConnected) {
-        const serverTime = await this.getServerTime()
-        if (serverTime) {
-          info.serverTime = serverTime.time
-        }
-      }
-    } catch (error) {
-      info.serverTimeError = error
-    }
+      await this.send(message)
 
-    return info
-  }
+      // Wait for response
+      return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error("Timeout waiting for tick history"))
+        }, 15000)
 
-  public async authorize(token: string): Promise<any> {
-    try {
-      this.token = token
-
-      if (this.isBrowser) {
-        localStorage.setItem("deriv_token", token)
-      }
-
-      const response = await this.send({
-        authorize: token,
-      })
-
-      if (response.authorize) {
-        this.accountInfo = response.authorize
-        this.onLoginCallbacks.forEach((callback) => callback(this.accountInfo))
-        return response
-      } else {
-        throw new Error("Authorization failed")
-      }
-    } catch (error) {
-      console.error("Authorization error:", error)
-      this.token = null
-      if (this.isBrowser) {
-        localStorage.removeItem("deriv_token")
-      }
-      throw error
-    }
-  }
-
-  private restoreSession() {
-    if (this.isBrowser) {
-      const token = localStorage.getItem("deriv_token")
-      if (token) {
-        console.log("Restoring session from saved token")
-        this.onOpen(() => {
-          this.authorize(token).catch((error) => {
-            console.error("Failed to restore session:", error)
-            localStorage.removeItem("deriv_token")
-          })
-        })
-      }
-
-      try {
-        const savedBalance = localStorage.getItem("deriv_balance")
-        if (savedBalance) {
-          const parsedBalance = JSON.parse(savedBalance)
-          if (Array.isArray(parsedBalance) && parsedBalance.length > 0) {
-            this.balances = parsedBalance
-            this.onBalanceCallbacks.forEach((callback) => callback(this.balances))
-          }
-        }
-      } catch (e) {
-        console.error("Failed to restore balance from localStorage:", e)
-      }
-    }
-  }
-
-  public logout(): void {
-    this.token = null
-    this.accountInfo = null
-    this.balances = [{ balance: 10000, currency: "USD" }]
-
-    if (this.isBrowser) {
-      localStorage.removeItem("deriv_token")
-      localStorage.removeItem("deriv_balance")
-    }
-
-    this.onLoginCallbacks.forEach((callback) => callback(null))
-    this.onBalanceCallbacks.forEach((callback) => callback(this.balances))
-  }
-
-  public async getAccountBalance(): Promise<any> {
-    try {
-      const response = await this.send({
-        balance: 1,
-        subscribe: 1,
-      })
-
-      if (response.balance) {
-        this.balances = [response.balance]
-        this.onBalanceCallbacks.forEach((callback) => callback(this.balances))
-
-        if (this.isBrowser) {
+        const originalOnMessage = this.ws?.onmessage
+        this.ws!.onmessage = (event) => {
           try {
-            localStorage.setItem("deriv_balance", JSON.stringify(this.balances))
-          } catch (e) {
-            console.error("Failed to save balance to localStorage:", e)
+            const data = JSON.parse(event.data)
+            if (data.history) {
+              clearTimeout(timeout)
+              this.ws!.onmessage = originalOnMessage
+              resolve(data)
+            } else if (data.error) {
+              clearTimeout(timeout)
+              this.ws!.onmessage = originalOnMessage
+              reject(new Error(data.error.message))
+            } else {
+              // Call original handler for other messages
+              if (originalOnMessage) {
+                originalOnMessage.call(this.ws, event)
+              }
+            }
+          } catch (error) {
+            clearTimeout(timeout)
+            this.ws!.onmessage = originalOnMessage
+            reject(error)
           }
         }
-
-        return response
-      }
-      return response
+      })
     } catch (error) {
-      console.error("Error getting account balance:", error)
+      console.error("❌ Error getting tick history:", error)
       throw error
     }
   }
 
-  public disconnect() {
-    if (this.reconnectTimeout) {
-      clearTimeout(this.reconnectTimeout)
-      this.reconnectTimeout = null
+  // Subscribe to ticks
+  async subscribeTicks(symbol: string, callback: (data: any) => void): Promise<void> {
+    this.subscriptions.set(symbol, callback)
+
+    const message = {
+      ticks: symbol,
+      subscribe: 1,
     }
 
-    if (this.socket) {
-      try {
-        this.socket.onopen = null
-        this.socket.onmessage = null
-        this.socket.onclose = null
-        this.socket.onerror = null
-        this.socket.close()
-      } catch (e) {
-        console.error("Error during disconnect:", e)
-      }
-      this.socket = null
+    try {
+      await this.send(message)
+      console.log(`✅ Subscribed to ${symbol}`)
+    } catch (error) {
+      console.error(`❌ Error subscribing to ${symbol}:`, error)
+      throw error
+    }
+  }
+
+  // Unsubscribe from ticks
+  async unsubscribeTicks(symbol: string): Promise<void> {
+    this.subscriptions.delete(symbol)
+
+    const message = {
+      forget_all: "ticks",
+    }
+
+    try {
+      await this.send(message)
+      console.log(`✅ Unsubscribed from ${symbol}`)
+    } catch (error) {
+      console.error(`❌ Error unsubscribing from ${symbol}:`, error)
+    }
+  }
+
+  // Authorize with token
+  async authorize(token: string): Promise<any> {
+    const message = {
+      authorize: token,
+    }
+
+    try {
+      return await this.send(message)
+    } catch (error) {
+      console.error("❌ Authorization error:", error)
+      throw error
+    }
+  }
+
+  // Get account balance
+  async getAccountBalance(): Promise<any> {
+    const message = {
+      balance: 1,
+      subscribe: 1,
+    }
+
+    try {
+      return await this.send(message)
+    } catch (error) {
+      console.error("❌ Error getting balance:", error)
+      throw error
+    }
+  }
+
+  // Get diagnostic info
+  async getDiagnosticInfo(): Promise<any> {
+    return {
+      isConnected: this.isConnected,
+      reconnectAttempts: this.reconnectAttempts,
+      currentEndpoint: this.endpoints[this.currentEndpointIndex],
+      subscriptions: Array.from(this.subscriptions.keys()),
+    }
+  }
+
+  // Logout
+  logout() {
+    console.log("👋 Logging out")
+    if (this.onLoginHandler) {
+      this.onLoginHandler(null)
+    }
+    if (this.onBalanceHandler) {
+      this.onBalanceHandler([])
+    }
+  }
+
+  // Disconnect
+  disconnect() {
+    console.log("🔌 Disconnecting from Deriv API")
+    this.forceOffline = true
+    this.stopPing()
+    this.subscriptions.clear()
+
+    if (this.ws) {
+      this.ws.close(1000, "Manual disconnect")
+      this.ws = null
     }
 
     this.isConnected = false
-    this.connectionState = "disconnected"
-    this.callbacks.clear()
-    this.subscriptions.clear()
   }
 }
 
+// Create singleton instance
 const derivAPI = new DerivAPI()
+
 export default derivAPI

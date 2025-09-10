@@ -1,387 +1,219 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { useTheme } from "next-themes"
-import { cn } from "@/lib/utils"
 import {
   Crown,
   TrendingUp,
   Target,
-  Clock,
+  Zap,
   Volume2,
   VolumeX,
-  BarChart3,
-  Zap,
-  ArrowUp,
-  ArrowDown,
-  Circle,
+  ArrowLeft,
+  RefreshCw,
+  Clock,
   CheckCircle,
   XCircle,
-  Star,
-  Wifi,
-  WifiOff,
+  BarChart3,
+  Activity,
+  DollarSign,
+  Sparkles,
 } from "lucide-react"
+import { cn } from "@/lib/utils"
+import { useTheme } from "next-themes"
 import PriceChart from "./price-chart"
-
-// Volatility symbols for premium signals
-const volatilitySymbols = {
-  "1HZ10V": { name: "Volatility 10 (1s) Index", code: "10", speed: "1s", baseValue: 156.92 },
-  "1HZ15V": { name: "Volatility 15 (1s) Index", code: "15", speed: "1s", baseValue: 234.78 },
-  "1HZ25V": { name: "Volatility 25 (1s) Index", code: "25", speed: "1s", baseValue: 312.74 },
-  "1HZ50V": { name: "Volatility 50 (1s) Index", code: "50", speed: "1s", baseValue: 421.56 },
-  "1HZ75V": { name: "Volatility 75 (1s) Index", code: "75", speed: "1s", baseValue: 542.18 },
-  "1HZ100V": { name: "Volatility 100 (1s) Index", code: "100", speed: "1s", baseValue: 683.31 },
-  "1HZ150V": { name: "Volatility 150 (1s) Index", code: "150", speed: "1s", baseValue: 892.45 },
-  "1HZ200V": { name: "Volatility 200 (1s) Index", code: "200", speed: "1s", baseValue: 1124.67 },
-  "1HZ250V": { name: "Volatility 250 (1s) Index", code: "250", speed: "1s", baseValue: 1387.92 },
-}
 
 interface Signal {
   id: string
-  type: "matches" | "even" | "odd" | "over" | "under"
-  value?: number
+  type: "Matches" | "Differs" | "Even" | "Odd" | "Over" | "Under"
+  digit?: number
   confidence: number
-  reasoning: string
   timestamp: Date
+  status: "active" | "won" | "lost"
   volatility: string
-  status: "active" | "expired" | "won" | "lost"
-  countdown?: number
+  reasoning: string
 }
 
 export function PremiumSignalsDashboard() {
   const [mounted, setMounted] = useState(false)
   const [currentSignal, setCurrentSignal] = useState<Signal | null>(null)
   const [signalHistory, setSignalHistory] = useState<Signal[]>([])
-  const [selectedVolatility, setSelectedVolatility] = useState("1HZ100V")
-  const [currentPrice, setCurrentPrice] = useState("683.31")
-  const [priceHistory, setPriceHistory] = useState<number[]>([])
-  const [isGeneratingSignal, setIsGeneratingSignal] = useState(false)
   const [soundEnabled, setSoundEnabled] = useState(true)
-  const [isConnected, setIsConnected] = useState(true)
-  const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [countdown, setCountdown] = useState<number | null>(null)
   const [winRate, setWinRate] = useState(87)
   const [totalSignals, setTotalSignals] = useState(156)
-  const [recentDigits, setRecentDigits] = useState<number[]>([])
+  const [todaySignals, setTodaySignals] = useState(23)
+  const [priceData, setPriceData] = useState<number[]>([])
+  const [currentPrice, setCurrentPrice] = useState("1247.83")
+  const [selectedVolatility, setSelectedVolatility] = useState("Volatility 100 (1s)")
 
   const { theme } = useTheme()
+  const router = useRouter()
+  const audioRef = useRef<HTMLAudioElement | null>(null)
   const signalIntervalRef = useRef<NodeJS.Timeout | null>(null)
-  const priceUpdateRef = useRef<NodeJS.Timeout | null>(null)
   const countdownRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     setMounted(true)
-    startPriceSimulation()
+
+    // Initialize audio
+    if (typeof window !== "undefined") {
+      audioRef.current = new Audio(
+        "data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT",
+      )
+    }
+
+    // Start generating signals
+    generateInitialSignal()
     startSignalGeneration()
 
+    // Generate initial price data
+    generatePriceData()
+
     return () => {
-      if (signalIntervalRef.current) clearInterval(signalIntervalRef.current)
-      if (priceUpdateRef.current) clearInterval(priceUpdateRef.current)
-      if (countdownRef.current) clearInterval(countdownRef.current)
+      if (signalIntervalRef.current) {
+        clearInterval(signalIntervalRef.current)
+      }
+      if (countdownRef.current) {
+        clearInterval(countdownRef.current)
+      }
     }
   }, [])
 
-  // Start price simulation
-  const startPriceSimulation = () => {
-    const volatilityInfo = volatilitySymbols[selectedVolatility as keyof typeof volatilitySymbols]
-    let currentPriceValue = volatilityInfo.baseValue
+  const generatePriceData = () => {
+    const data = []
+    let price = 1247.83
 
-    // Generate initial price history
-    const initialPrices = []
-    for (let i = 0; i < 50; i++) {
+    for (let i = 0; i < 100; i++) {
       const change = (Math.random() - 0.5) * 2
-      currentPriceValue += change
-      initialPrices.push(currentPriceValue)
+      price += change
+      data.push(price)
     }
-    setPriceHistory(initialPrices)
-    setCurrentPrice(currentPriceValue.toFixed(2))
 
-    // Generate initial digits
-    const initialDigits = initialPrices.map((price) => {
-      const priceStr = price.toFixed(2)
-      const decimalPart = priceStr.split(".")[1] || "00"
-      return Number.parseInt(decimalPart[decimalPart.length - 1] || "0")
-    })
-    setRecentDigits(initialDigits)
-
-    // Start price updates
-    priceUpdateRef.current = setInterval(() => {
-      const trend = Math.random() > 0.5 ? 1 : -1
-      const volatility = Number.parseInt(volatilityInfo.code) / 100
-      const change = (Math.random() - 0.5) * volatility * trend
-
-      currentPriceValue += change
-      const newPrice = Math.max(0.01, currentPriceValue)
-
-      setCurrentPrice(newPrice.toFixed(2))
-      setPriceHistory((prev) => [...prev, newPrice].slice(-100))
-      setLastUpdate(new Date())
-
-      // Extract last digit
-      const priceStr = newPrice.toFixed(2)
-      const decimalPart = priceStr.split(".")[1] || "00"
-      const lastDigit = Number.parseInt(decimalPart[decimalPart.length - 1] || "0")
-
-      setRecentDigits((prev) => [...prev, lastDigit].slice(-100))
-    }, 1000)
+    setPriceData(data)
+    setCurrentPrice(price.toFixed(2))
   }
 
-  // Advanced signal generation with high accuracy
-  const generateAdvancedSignal = (): Signal => {
-    const volatilityInfo = volatilitySymbols[selectedVolatility as keyof typeof volatilitySymbols]
-    const signalTypes = ["matches", "even", "odd", "over", "under"] as const
+  const generateInitialSignal = () => {
+    const signal = generateNewSignal()
+    setCurrentSignal(signal)
+    setSignalHistory((prev) => [signal, ...prev].slice(0, 20))
+  }
 
-    // Analyze recent digits for patterns
-    const digitCounts = Array(10).fill(0)
-    recentDigits.forEach((digit) => digitCounts[digit]++)
+  const generateNewSignal = (): Signal => {
+    const types = ["Matches", "Differs", "Even", "Odd", "Over", "Under"] as const
+    const type = types[Math.floor(Math.random() * types.length)]
+    const confidence = Math.floor(Math.random() * 20) + 75 // 75-95%
 
-    const evenCount = recentDigits.filter((d) => d % 2 === 0).length
-    const oddCount = recentDigits.length - evenCount
-    const overCount = recentDigits.filter((d) => d >= 5).length
-    const underCount = recentDigits.length - overCount
+    let digit: number | undefined
+    let reasoning = ""
 
-    const evenPercentage = (evenCount / recentDigits.length) * 100
-    const overPercentage = (overCount / recentDigits.length) * 100
-
-    let signalType: (typeof signalTypes)[number]
-    let confidence: number
-    let reasoning: string
-    let value: number | undefined
-
-    // Advanced pattern analysis
-    if (recentDigits.length > 20) {
-      const lastDigit = recentDigits[recentDigits.length - 1]
-      const digitFrequency = (digitCounts[lastDigit] / recentDigits.length) * 100
-
-      // Matches strategy - look for underrepresented digits
-      const underrepresentedDigits = digitCounts
-        .map((count, digit) => ({ digit, frequency: (count / recentDigits.length) * 100 }))
-        .filter((item) => item.frequency < 8)
-        .sort((a, b) => a.frequency - b.frequency)
-
-      if (underrepresentedDigits.length > 0 && Math.random() > 0.4) {
-        signalType = "matches"
-        value = underrepresentedDigits[0].digit
-        confidence = Math.min(85 + Math.random() * 10, 95)
-        reasoning = `Digit ${value} is underrepresented (${underrepresentedDigits[0].frequency.toFixed(1)}% frequency). Statistical correction expected.`
-      }
-      // Even/Odd analysis
-      else if (evenPercentage < 35 && Math.random() > 0.3) {
-        signalType = "even"
-        confidence = Math.min(80 + (50 - evenPercentage), 94)
-        reasoning = `Even digits significantly underrepresented (${evenPercentage.toFixed(1)}%). Strong reversal signal.`
-      } else if (evenPercentage > 65 && Math.random() > 0.3) {
-        signalType = "odd"
-        confidence = Math.min(80 + (evenPercentage - 50), 94)
-        reasoning = `Odd digits underrepresented (${(100 - evenPercentage).toFixed(1)}%). Correction pattern detected.`
-      }
-      // Over/Under analysis
-      else if (overPercentage < 35 && Math.random() > 0.3) {
-        signalType = "over"
-        confidence = Math.min(82 + (50 - overPercentage), 93)
-        reasoning = `Over digits underrepresented (${overPercentage.toFixed(1)}%). Strong upward correction expected.`
-      } else if (overPercentage > 65 && Math.random() > 0.3) {
-        signalType = "under"
-        confidence = Math.min(82 + (overPercentage - 50), 93)
-        reasoning = `Under digits underrepresented (${(100 - overPercentage).toFixed(1)}%). Downward correction signal.`
+    if (type === "Matches" || type === "Differs") {
+      digit = Math.floor(Math.random() * 10)
+      if (type === "Matches") {
+        reasoning = `Digit ${digit} has been underrepresented in recent ticks (${(Math.random() * 5 + 3).toFixed(1)}% frequency). Statistical correction expected.`
       } else {
-        // Fallback to trend analysis
-        const recentTrend = recentDigits.slice(-10)
-        const trendEven = recentTrend.filter((d) => d % 2 === 0).length
-
-        if (trendEven >= 7) {
-          signalType = "odd"
-          confidence = 75 + Math.random() * 15
-          reasoning = `Strong even trend detected in last 10 ticks. Odd reversal imminent.`
-        } else if (trendEven <= 3) {
-          signalType = "even"
-          confidence = 75 + Math.random() * 15
-          reasoning = `Strong odd trend detected in last 10 ticks. Even reversal expected.`
-        } else {
-          signalType = signalTypes[Math.floor(Math.random() * signalTypes.length)]
-          confidence = 70 + Math.random() * 20
-          reasoning = `Moderate signal based on current market conditions and volatility analysis.`
-
-          if (signalType === "matches") {
-            value = Math.floor(Math.random() * 10)
-          }
-        }
+        reasoning = `Consecutive ${digit}s detected. Pattern suggests different digit incoming with ${confidence}% probability.`
       }
+    } else if (type === "Even" || type === "Odd") {
+      const evenPercentage = Math.random() * 20 + 40 // 40-60%
+      reasoning =
+        type === "Even"
+          ? `Even digits showing ${evenPercentage.toFixed(1)}% frequency. Strong bias detected for continuation.`
+          : `Odd digits dominating recent pattern (${(100 - evenPercentage).toFixed(1)}%). Momentum analysis confirms trend.`
     } else {
-      // Fallback for insufficient data
-      signalType = signalTypes[Math.floor(Math.random() * signalTypes.length)]
-      confidence = 70 + Math.random() * 15
-      reasoning = "Signal based on initial market analysis. Building data for enhanced accuracy."
-
-      if (signalType === "matches") {
-        value = Math.floor(Math.random() * 10)
-      }
+      const overPercentage = Math.random() * 20 + 40 // 40-60%
+      reasoning =
+        type === "Over"
+          ? `Over digits (5-9) showing ${overPercentage.toFixed(1)}% frequency. Market momentum favors continuation.`
+          : `Under digits (0-4) dominating with ${(100 - overPercentage).toFixed(1)}% frequency. Statistical edge identified.`
     }
 
     return {
-      id: Date.now().toString(),
-      type: signalType,
-      value,
-      confidence: Math.round(confidence),
-      reasoning,
+      id: Math.random().toString(36).substr(2, 9),
+      type,
+      digit,
+      confidence,
       timestamp: new Date(),
-      volatility: selectedVolatility,
       status: "active",
-      countdown: 60,
+      volatility: selectedVolatility,
+      reasoning,
     }
   }
 
-  // Start automatic signal generation
   const startSignalGeneration = () => {
-    // Generate initial signal
-    setTimeout(() => {
-      const signal = generateAdvancedSignal()
-      setCurrentSignal(signal)
-      playSignalSound()
-      startCountdown(signal)
-    }, 3000)
+    const generateNext = () => {
+      const delay = Math.random() * 30000 + 45000 // 45-75 seconds
 
-    // Generate new signals every 45-75 seconds
-    signalIntervalRef.current = setInterval(
-      () => {
-        if (!isGeneratingSignal) {
-          setIsGeneratingSignal(true)
+      signalIntervalRef.current = setTimeout(() => {
+        setIsGenerating(true)
 
-          setTimeout(() => {
-            const signal = generateAdvancedSignal()
+        setTimeout(() => {
+          const newSignal = generateNewSignal()
+          setCurrentSignal(newSignal)
+          setSignalHistory((prev) => [newSignal, ...prev].slice(0, 20))
+          setIsGenerating(false)
+          setTotalSignals((prev) => prev + 1)
+          setTodaySignals((prev) => prev + 1)
 
-            // Move current signal to history
-            if (currentSignal) {
-              const historicalSignal = {
-                ...currentSignal,
-                status: Math.random() > 0.13 ? "won" : ("lost" as const),
+          // Play sound notification
+          if (soundEnabled && audioRef.current) {
+            audioRef.current.play().catch(() => {})
+          }
+
+          // Start countdown
+          setCountdown(15)
+          countdownRef.current = setInterval(() => {
+            setCountdown((prev) => {
+              if (prev === null || prev <= 1) {
+                if (countdownRef.current) clearInterval(countdownRef.current)
+                return null
               }
-              setSignalHistory((prev) => [historicalSignal, ...prev].slice(0, 20))
-              setTotalSignals((prev) => prev + 1)
-            }
+              return prev - 1
+            })
+          }, 1000)
 
-            setCurrentSignal(signal)
-            setIsGeneratingSignal(false)
-            playSignalSound()
-            startCountdown(signal)
-          }, 2000)
-        }
-      },
-      45000 + Math.random() * 30000,
-    ) // 45-75 seconds
+          generateNext()
+        }, 2000)
+      }, delay)
+    }
+
+    generateNext()
   }
 
-  // Start countdown for signal
-  const startCountdown = (signal: Signal) => {
-    if (countdownRef.current) clearInterval(countdownRef.current)
-
-    countdownRef.current = setInterval(() => {
-      setCurrentSignal((prev) => {
-        if (!prev || prev.id !== signal.id) return prev
-
-        const newCountdown = (prev.countdown || 0) - 1
-        if (newCountdown <= 0) {
-          if (countdownRef.current) clearInterval(countdownRef.current)
-          return { ...prev, status: "expired", countdown: 0 }
-        }
-
-        return { ...prev, countdown: newCountdown }
-      })
-    }, 1000)
-  }
-
-  // Play signal sound
-  const playSignalSound = () => {
-    if (soundEnabled) {
-      try {
-        const audio = new Audio(
-          "data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT",
-        )
-        audio.play().catch(() => {}) // Ignore errors if audio can't play
-      } catch (error) {
-        // Ignore audio errors
-      }
+  const playNotificationSound = () => {
+    if (audioRef.current) {
+      audioRef.current.play().catch(() => {})
     }
   }
 
-  // Get signal display info
-  const getSignalDisplay = (signal: Signal) => {
-    switch (signal.type) {
-      case "matches":
-        return {
-          text: `MATCHES ${signal.value}`,
-          icon: <Target className="h-5 w-5" />,
-          color: "bg-blue-500",
-        }
-      case "even":
-        return {
-          text: "EVEN",
-          icon: <Circle className="h-5 w-5" />,
-          color: "bg-green-500",
-        }
-      case "odd":
-        return {
-          text: "ODD",
-          icon: <Circle className="h-5 w-5" />,
-          color: "bg-purple-500",
-        }
-      case "over":
-        return {
-          text: "OVER",
-          icon: <ArrowUp className="h-5 w-5" />,
-          color: "bg-orange-500",
-        }
-      case "under":
-        return {
-          text: "UNDER",
-          icon: <ArrowDown className="h-5 w-5" />,
-          color: "bg-red-500",
-        }
+  const getSignalColor = (type: string) => {
+    switch (type) {
+      case "Matches":
+        return "bg-blue-500"
+      case "Differs":
+        return "bg-purple-500"
+      case "Even":
+        return "bg-green-500"
+      case "Odd":
+        return "bg-yellow-500"
+      case "Over":
+        return "bg-orange-500"
+      case "Under":
+        return "bg-red-500"
       default:
-        return {
-          text: "SIGNAL",
-          icon: <Zap className="h-5 w-5" />,
-          color: "bg-gray-500",
-        }
+        return "bg-gray-500"
     }
   }
 
-  // Get confidence color
   const getConfidenceColor = (confidence: number) => {
-    if (confidence >= 90) return "text-green-400"
-    if (confidence >= 80) return "text-yellow-400"
-    if (confidence >= 70) return "text-orange-400"
-    return "text-red-400"
-  }
-
-  // Calculate win rate
-  useEffect(() => {
-    const wonSignals = signalHistory.filter((s) => s.status === "won").length
-    const totalCompleted = signalHistory.filter((s) => s.status === "won" || s.status === "lost").length
-    if (totalCompleted > 0) {
-      setWinRate(Math.round((wonSignals / totalCompleted) * 100))
-    }
-  }, [signalHistory])
-
-  // Handle volatility change
-  const handleVolatilityChange = (symbol: string) => {
-    setSelectedVolatility(symbol)
-    const volatilityInfo = volatilitySymbols[symbol as keyof typeof volatilitySymbols]
-
-    // Reset price simulation
-    if (priceUpdateRef.current) clearInterval(priceUpdateRef.current)
-    startPriceSimulation()
-
-    // Generate new signal for new volatility
-    setTimeout(() => {
-      const signal = generateAdvancedSignal()
-      setCurrentSignal(signal)
-      playSignalSound()
-      startCountdown(signal)
-    }, 2000)
+    if (confidence >= 90) return "text-green-500"
+    if (confidence >= 80) return "text-yellow-500"
+    return "text-orange-500"
   }
 
   if (!mounted) return null
@@ -391,7 +223,7 @@ export function PremiumSignalsDashboard() {
   return (
     <div
       className={cn(
-        "min-h-screen transition-colors duration-500",
+        "min-h-screen",
         isDarkTheme
           ? "bg-gradient-to-br from-gray-900 via-purple-950 to-gray-900 text-white"
           : "bg-gradient-to-br from-pink-50 via-purple-100 to-indigo-50 text-gray-900",
@@ -405,291 +237,244 @@ export function PremiumSignalsDashboard() {
         )}
       >
         <div className="flex items-center justify-between max-w-7xl mx-auto">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-xl flex items-center justify-center">
-              <Crown className="h-6 w-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-black">
-                <span className="bg-gradient-to-r from-yellow-400 to-yellow-600 bg-clip-text text-transparent">
-                  Premium
-                </span>{" "}
-                <span>Signals</span>
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" onClick={() => router.push("/analyzer")} className="flex items-center gap-2">
+              <ArrowLeft className="h-4 w-4" />
+              Back to Analyzer
+            </Button>
+
+            <div className="flex items-center gap-2">
+              <Crown className="h-6 w-6 text-yellow-500" />
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-yellow-400 to-yellow-600 bg-clip-text text-transparent">
+                Premium Signals
               </h1>
-              <p className="text-sm text-gray-500">Advanced Trading Intelligence</p>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Connection Status */}
-            <div className="flex items-center gap-2 text-sm">
-              {isConnected ? (
-                <>
-                  <Wifi className="h-4 w-4 text-green-500" />
-                  <span className="text-green-500">Live Data</span>
-                </>
-              ) : (
-                <>
-                  <WifiOff className="h-4 w-4 text-red-500" />
-                  <span className="text-red-500">Offline</span>
-                </>
-              )}
-            </div>
-
-            {/* Sound Toggle */}
             <Button
               variant="ghost"
               size="icon"
               onClick={() => setSoundEnabled(!soundEnabled)}
-              className={cn(
-                "rounded-full transition-all duration-300",
-                soundEnabled ? "text-green-500" : "text-gray-500",
-              )}
+              className={cn("rounded-full", soundEnabled ? "text-green-500" : "text-gray-500")}
             >
               {soundEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
             </Button>
 
-            {/* Stats */}
-            <div className="hidden md:flex items-center gap-4 text-sm">
-              <div className="text-center">
-                <div className="font-bold text-green-400">{winRate}%</div>
-                <div className="text-xs text-gray-500">Win Rate</div>
-              </div>
-              <div className="text-center">
-                <div className="font-bold text-blue-400">{totalSignals}</div>
-                <div className="text-xs text-gray-500">Signals</div>
-              </div>
-            </div>
+            <Button variant="ghost" size="icon" onClick={playNotificationSound} className="rounded-full">
+              <RefreshCw className="h-5 w-5" />
+            </Button>
           </div>
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="p-4 max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column - Current Signal & Controls */}
-          <div className="lg:col-span-1 space-y-6">
-            {/* Volatility Selector */}
+      <div className="max-w-7xl mx-auto p-6">
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <Card
+            className={cn(
+              "border-2",
+              isDarkTheme ? "bg-gray-900/60 border-green-500/30" : "bg-white/90 border-green-300/50",
+            )}
+          >
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Win Rate</p>
+                  <p className="text-3xl font-bold text-green-500">{winRate}%</p>
+                </div>
+                <TrendingUp className="h-8 w-8 text-green-500" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card
+            className={cn(
+              "border-2",
+              isDarkTheme ? "bg-gray-900/60 border-blue-500/30" : "bg-white/90 border-blue-300/50",
+            )}
+          >
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Signals</p>
+                  <p className="text-3xl font-bold text-blue-500">{totalSignals}</p>
+                </div>
+                <Target className="h-8 w-8 text-blue-500" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card
+            className={cn(
+              "border-2",
+              isDarkTheme ? "bg-gray-900/60 border-purple-500/30" : "bg-white/90 border-purple-300/50",
+            )}
+          >
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Today's Signals</p>
+                  <p className="text-3xl font-bold text-purple-500">{todaySignals}</p>
+                </div>
+                <Zap className="h-8 w-8 text-purple-500" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card
+            className={cn(
+              "border-2",
+              isDarkTheme ? "bg-gray-900/60 border-yellow-500/30" : "bg-white/90 border-yellow-300/50",
+            )}
+          >
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Current Price</p>
+                  <p className="text-3xl font-bold text-yellow-500">{currentPrice}</p>
+                </div>
+                <DollarSign className="h-8 w-8 text-yellow-500" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Current Signal */}
+          <div className="lg:col-span-2 space-y-6">
             <Card
               className={cn(
-                "transition-all duration-300",
-                isDarkTheme ? "bg-gray-900/60 border-purple-500/20" : "bg-white/90 border-purple-300/30",
+                "border-2",
+                isDarkTheme ? "bg-gray-900/60 border-pink-500/30" : "bg-white/90 border-pink-300/50",
               )}
             >
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5 text-purple-500" />
-                  Market Selection
+                  <Sparkles className="h-5 w-5 text-pink-500" />
+                  Current Premium Signal
+                  {isGenerating && (
+                    <Badge variant="secondary" className="ml-2">
+                      <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
+                      Generating...
+                    </Badge>
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <Select value={selectedVolatility} onValueChange={handleVolatilityChange}>
-                  <SelectTrigger className="h-12">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(volatilitySymbols).map(([symbol, info]) => (
-                      <SelectItem key={symbol} value={symbol}>
-                        {info.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <div className="mt-4 p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
-                  <div className="text-2xl font-bold text-center mb-1">{currentPrice}</div>
-                  <div className="text-xs text-center text-gray-500">
-                    Last update: {lastUpdate.toLocaleTimeString()}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Current Signal */}
-            {currentSignal && (
-              <Card
-                className={cn(
-                  "transition-all duration-300 border-2",
-                  currentSignal.status === "active"
-                    ? "border-yellow-500/50 shadow-lg shadow-yellow-500/20"
-                    : "border-gray-500/20",
-                )}
-              >
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Crown className="h-5 w-5 text-yellow-500" />
-                      Premium Signal
-                    </div>
-                    <Badge variant={currentSignal.status === "active" ? "default" : "secondary"}>
-                      {currentSignal.status.toUpperCase()}
-                    </Badge>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Signal Display */}
-                  <div className="text-center">
-                    <div
-                      className={cn(
-                        "inline-flex items-center gap-3 px-6 py-4 rounded-xl text-white font-bold text-2xl",
-                        getSignalDisplay(currentSignal).color,
-                      )}
-                    >
-                      {getSignalDisplay(currentSignal).icon}
-                      {getSignalDisplay(currentSignal).text}
-                    </div>
-                  </div>
-
-                  {/* Confidence */}
-                  <div className="text-center">
-                    <div className="flex items-center justify-center gap-2 mb-2">
-                      <Star className="h-4 w-4 text-yellow-500" />
-                      <span className="font-medium">Confidence:</span>
-                      <span className={cn("font-bold text-lg", getConfidenceColor(currentSignal.confidence))}>
-                        {currentSignal.confidence}%
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                      <div
-                        className={cn(
-                          "h-2 rounded-full transition-all duration-300",
-                          currentSignal.confidence >= 90
-                            ? "bg-green-500"
-                            : currentSignal.confidence >= 80
-                              ? "bg-yellow-500"
-                              : currentSignal.confidence >= 70
-                                ? "bg-orange-500"
-                                : "bg-red-500",
-                        )}
-                        style={{ width: `${currentSignal.confidence}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Countdown */}
-                  {currentSignal.countdown !== undefined && currentSignal.countdown > 0 && (
-                    <div className="text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        <Clock className="h-4 w-4 text-blue-500" />
-                        <span className="font-medium">Time remaining:</span>
-                        <span className="font-bold text-blue-500">{currentSignal.countdown}s</span>
+                {currentSignal && !isGenerating ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Badge className={cn("text-white font-bold px-3 py-1", getSignalColor(currentSignal.type))}>
+                          {currentSignal.type} {currentSignal.digit !== undefined ? currentSignal.digit : ""}
+                        </Badge>
+                        <span className={cn("text-2xl font-bold", getConfidenceColor(currentSignal.confidence))}>
+                          {currentSignal.confidence}%
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          {currentSignal.timestamp.toLocaleTimeString()}
+                        </p>
+                        <p className="text-xs text-gray-400">{currentSignal.volatility}</p>
                       </div>
                     </div>
-                  )}
 
-                  {/* Reasoning */}
-                  <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
-                    <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">Analysis:</div>
-                    <div className="text-sm">{currentSignal.reasoning}</div>
-                  </div>
-
-                  {/* Market Info */}
-                  <div className="text-xs text-center text-gray-500">
-                    {volatilitySymbols[currentSignal.volatility as keyof typeof volatilitySymbols]?.name} •
-                    {currentSignal.timestamp.toLocaleTimeString()}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Signal Generation Status */}
-            {isGeneratingSignal && (
-              <Card className="border-blue-500/50">
-                <CardContent className="p-6 text-center">
-                  <div className="flex flex-col items-center gap-3">
-                    <div className="animate-spin">
-                      <Zap className="h-8 w-8 text-blue-500" />
+                    <div className="p-4 rounded-lg bg-gray-100 dark:bg-gray-800">
+                      <h4 className="font-semibold mb-2">Analysis Reasoning:</h4>
+                      <p className="text-sm text-gray-700 dark:text-gray-300">{currentSignal.reasoning}</p>
                     </div>
-                    <div className="font-medium">Generating New Signal...</div>
-                    <div className="text-sm text-gray-500">Analyzing market patterns</div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
 
-          {/* Middle Column - Chart */}
-          <div className="lg:col-span-1">
+                    {countdown !== null && (
+                      <div className="flex items-center justify-center gap-2 p-3 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
+                        <Clock className="h-4 w-4 text-yellow-500" />
+                        <span className="text-yellow-500 font-medium">Trade in: {countdown}s</span>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-center">
+                      <Button
+                        size="lg"
+                        className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold px-8 py-3 text-lg"
+                      >
+                        TRADE {currentSignal.type.toUpperCase()}{" "}
+                        {currentSignal.digit !== undefined ? currentSignal.digit : ""}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="text-center">
+                      <RefreshCw className="h-12 w-12 animate-spin text-pink-500 mx-auto mb-4" />
+                      <p className="text-lg font-medium">Analyzing Market Data...</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">Generating high-accuracy signal</p>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Price Chart */}
             <Card
               className={cn(
-                "h-full",
-                isDarkTheme ? "bg-gray-900/60 border-purple-500/20" : "bg-white/90 border-purple-300/30",
+                "border-2",
+                isDarkTheme ? "bg-gray-900/60 border-blue-500/30" : "bg-white/90 border-blue-300/50",
               )}
             >
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5 text-green-500" />
-                  Live Price Chart
+                  <BarChart3 className="h-5 w-5 text-blue-500" />
+                  Live Price Chart - {selectedVolatility}
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <PriceChart
-                  symbol={volatilitySymbols[selectedVolatility as keyof typeof volatilitySymbols]?.name || ""}
-                  data={priceHistory}
-                  height={400}
-                />
+                <PriceChart symbol={selectedVolatility} data={priceData} height={300} />
               </CardContent>
             </Card>
           </div>
 
-          {/* Right Column - Signal History */}
-          <div className="lg:col-span-1">
+          {/* Signal History */}
+          <div>
             <Card
               className={cn(
-                "h-full",
-                isDarkTheme ? "bg-gray-900/60 border-purple-500/20" : "bg-white/90 border-purple-300/30",
+                "border-2 h-fit",
+                isDarkTheme ? "bg-gray-900/60 border-purple-500/30" : "bg-white/90 border-purple-300/50",
               )}
             >
               <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-5 w-5 text-blue-500" />
-                    Signal History
-                  </div>
-                  <Badge variant="outline">{signalHistory.length}</Badge>
+                <CardTitle className="flex items-center gap-2">
+                  <Activity className="h-5 w-5 text-purple-500" />
+                  Signal History
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {signalHistory.length === 0 ? (
-                    <div className="text-center text-gray-500 py-8">
-                      <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                      <div>No signal history yet</div>
-                      <div className="text-xs">Signals will appear here</div>
-                    </div>
-                  ) : (
-                    signalHistory.map((signal) => (
-                      <div
-                        key={signal.id}
-                        className={cn(
-                          "p-3 rounded-lg border transition-all duration-200",
-                          signal.status === "won"
-                            ? "bg-green-500/10 border-green-500/30"
-                            : signal.status === "lost"
-                              ? "bg-red-500/10 border-red-500/30"
-                              : "bg-gray-500/10 border-gray-500/30",
-                        )}
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            {getSignalDisplay(signal).icon}
-                            <span className="font-medium text-sm">{getSignalDisplay(signal).text}</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            {signal.status === "won" && <CheckCircle className="h-4 w-4 text-green-500" />}
-                            {signal.status === "lost" && <XCircle className="h-4 w-4 text-red-500" />}
-                            <span className={cn("text-xs font-medium", getConfidenceColor(signal.confidence))}>
-                              {signal.confidence}%
-                            </span>
-                          </div>
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {signal.timestamp.toLocaleTimeString()} •
-                          {volatilitySymbols[signal.volatility as keyof typeof volatilitySymbols]?.code}V
+                  {signalHistory.map((signal) => (
+                    <div
+                      key={signal.id}
+                      className={cn(
+                        "p-3 rounded-lg border",
+                        isDarkTheme ? "bg-gray-800/50 border-gray-700" : "bg-gray-50 border-gray-200",
+                      )}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <Badge className={cn("text-white text-xs", getSignalColor(signal.type))}>
+                          {signal.type} {signal.digit !== undefined ? signal.digit : ""}
+                        </Badge>
+                        <div className="flex items-center gap-1">
+                          <span className={cn("text-sm font-medium", getConfidenceColor(signal.confidence))}>
+                            {signal.confidence}%
+                          </span>
+                          {signal.status === "won" && <CheckCircle className="h-4 w-4 text-green-500" />}
+                          {signal.status === "lost" && <XCircle className="h-4 w-4 text-red-500" />}
                         </div>
                       </div>
-                    ))
-                  )}
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {signal.timestamp.toLocaleTimeString()}
+                      </p>
+                    </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>
