@@ -108,11 +108,15 @@ const _0xDISABLE = () => {
 
 // Map of volatility symbols to their display names
 const volatilitySymbols = {
-  "1HZ100V": { name: "Volatility 100 (1s) Index", code: "100", speed: "1s", baseValue: 683.31 },
-  "1HZ75V": { name: "Volatility 75 (1s) Index", code: "75", speed: "1s", baseValue: 542.18 },
-  "1HZ50V": { name: "Volatility 50 (1s) Index", code: "50", speed: "1s", baseValue: 421.56 },
-  "1HZ25V": { name: "Volatility 25 (1s) Index", code: "25", speed: "1s", baseValue: 312.74 },
   "1HZ10V": { name: "Volatility 10 (1s) Index", code: "10", speed: "1s", baseValue: 156.92 },
+  "1HZ15V": { name: "Volatility 15 (1s) Index", code: "15", speed: "1s", baseValue: 234.78 },
+  "1HZ25V": { name: "Volatility 25 (1s) Index", code: "25", speed: "1s", baseValue: 312.74 },
+  "1HZ50V": { name: "Volatility 50 (1s) Index", code: "50", speed: "1s", baseValue: 421.56 },
+  "1HZ75V": { name: "Volatility 75 (1s) Index", code: "75", speed: "1s", baseValue: 542.18 },
+  "1HZ100V": { name: "Volatility 100 (1s) Index", code: "100", speed: "1s", baseValue: 683.31 },
+  "1HZ150V": { name: "Volatility 150 (1s) Index", code: "150", speed: "1s", baseValue: 892.45 },
+  "1HZ200V": { name: "Volatility 200 (1s) Index", code: "200", speed: "1s", baseValue: 1124.67 },
+  "1HZ250V": { name: "Volatility 250 (1s) Index", code: "250", speed: "1s", baseValue: 1387.92 },
 }
 
 const strategies = ["Matches", "Differs", "Even", "Odd", "Over", "Under"]

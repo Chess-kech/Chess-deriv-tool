@@ -7,16 +7,34 @@ import { useRouter } from "next/navigation"
 import { useAuth } from "@/components/auth-provider"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ThemeProvider } from "@/components/theme-provider"
 import { useTheme } from "next-themes"
-import { Eye, EyeOff, User, Lock, DollarSign, Sparkles, TrendingUp, BarChart3, ArrowRight } from 'lucide-react'
+import {
+  Eye,
+  EyeOff,
+  User,
+  Lock,
+  DollarSign,
+  Sparkles,
+  TrendingUp,
+  BarChart3,
+  ArrowRight,
+  MessageCircle,
+} from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { TermsAndConditions } from "@/components/terms-and-conditions"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { toast } from 'sonner'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { toast } from "sonner"
 
 export default function LoginPage() {
   const [username, setUsername] = useState("")
@@ -51,13 +69,13 @@ export default function LoginPage() {
     try {
       const success = await login(username, password)
       if (success) {
-        toast.success('Login successful!')
-        router.push('/')
+        toast.success("Login successful!")
+        router.push("/")
       } else {
-        toast.error('Invalid username or password')
+        toast.error("Invalid username or password")
       }
     } catch (error) {
-      toast.error('An error occurred during login')
+      toast.error("An error occurred during login")
     } finally {
       setIsLoading(false)
     }
@@ -80,7 +98,7 @@ export default function LoginPage() {
           <div className="absolute -bottom-8 left-20 w-72 h-72 bg-pink-500 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-4000"></div>
 
           {/* Grid pattern overlay */}
-          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iZ3JpZCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9OVXNlIj48cGF0aCBkPSJNIDQwIDAgTCAwIDAgMCA0MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMDUpIiBzdHJva2Utd2lkdGg9IjEiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjZ3JpZCIvPjwvYXN2Zz4=')] opacity-20"></div>
+          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iZ3JpZCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9OVXNlIj48cGF0aCBkPSJNIDQwIDAgTCAwIDAgMCA0MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMDUpIiBzdHJva2Utd2lkdGg9IjEiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjZ3JpZCkiLz48L2Fzdmc+')] opacity-20"></div>
         </div>
 
         {/* Main Content */}
@@ -295,13 +313,13 @@ export default function LoginPage() {
                     </div>
                   </div>
 
-                  {/* Contact Button */}
+                  {/* Prominent Contact Button */}
                   <Button
-                    variant="outline"
                     onClick={() => setContactDialogOpen(true)}
-                    className="w-full border-white/20 text-white hover:bg-white/10 font-medium"
+                    className="w-full h-14 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white font-bold text-lg shadow-lg shadow-orange-500/20 hover:shadow-orange-500/40 transition-all duration-300 transform hover:scale-[1.02]"
                   >
-                    Need Login Credentials?
+                    <MessageCircle className="h-5 w-5 mr-2" />
+                    Get Login Credentials - $85
                   </Button>
 
                   {/* Sign up Deriv Button */}
@@ -334,43 +352,53 @@ export default function LoginPage() {
 
       {/* Contact Admin Dialog */}
       <Dialog open={contactDialogOpen} onOpenChange={setContactDialogOpen}>
-        <DialogContent className="bg-gray-900/95 backdrop-blur-xl border-white/20 text-white">
+        <DialogContent className="bg-gray-900/95 backdrop-blur-xl border-white/20 text-white max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+            <DialogTitle className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent text-center">
               Get Login Credentials
             </DialogTitle>
-            <DialogDescription className="text-gray-300">
+            <DialogDescription className="text-gray-300 text-center">
               Contact the administrator for platform access
             </DialogDescription>
           </DialogHeader>
 
           {/* Price Display */}
-          <div className="flex justify-center my-4">
-            <div className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full shadow-lg">
-              <DollarSign className="h-6 w-6 text-white mr-2" />
-              <span className="text-white font-black text-2xl">85</span>
+          <div className="flex justify-center my-6">
+            <div className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full shadow-lg">
+              <DollarSign className="h-8 w-8 text-white mr-3" />
+              <span className="text-white font-black text-3xl">85</span>
             </div>
           </div>
 
-          <div className="space-y-4"></div>
+          <div className="space-y-4 text-center">
+            <p className="text-gray-300 text-sm">
+              Get instant access to the premium Deriv Analysis Tool with advanced trading signals and real-time market
+              analysis.
+            </p>
+            <div className="bg-gray-800/50 rounded-lg p-4">
+              <h4 className="text-white font-semibold mb-2">What's Included:</h4>
+              <ul className="text-sm text-gray-300 space-y-1">
+                <li>• Premium trading signals</li>
+                <li>• Real-time market analysis</li>
+                <li>• Advanced pattern recognition</li>
+                <li>• 24/7 platform access</li>
+              </ul>
+            </div>
+          </div>
 
-          <DialogFooter className="flex flex-col sm:flex-row gap-3">
-            <Button variant="outline" className="w-full bg-transparent" onClick={() => setContactDialogOpen(false)}>
-              Cancel
-            </Button>
-
-            <div className="flex gap-2 w-full sm:w-auto">
+          <DialogFooter className="flex flex-col gap-3 mt-6">
+            <div className="flex gap-2 w-full">
               <Button
                 onClick={() => {
                   const phoneNumber = "254787570246"
                   const message =
-                    "Hi! I want to get access to the Danalysis tool platform. Please provide login credentials."
+                    "Hi! I want to get access to the Danalysis tool platform for $85. Please provide login credentials."
                   const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`
                   window.open(whatsappUrl, "_blank")
                 }}
-                className="bg-green-600 hover:bg-green-700 flex-1 sm:flex-none"
+                className="bg-green-600 hover:bg-green-700 flex-1 h-12 font-semibold"
               >
-                <svg className="h-4 w-4 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                <svg className="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
                 </svg>
                 WhatsApp
@@ -378,14 +406,22 @@ export default function LoginPage() {
 
               <Button
                 onClick={() => window.open("https://t.me/+254787570246", "_blank")}
-                className="bg-blue-600 hover:bg-blue-700 flex-1 sm:flex-none"
+                className="bg-blue-600 hover:bg-blue-700 flex-1 h-12 font-semibold"
               >
-                <svg className="h-4 w-4 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                <svg className="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" />
                 </svg>
                 Telegram
               </Button>
             </div>
+
+            <Button
+              variant="outline"
+              className="w-full bg-transparent border-white/20 text-white hover:bg-white/10"
+              onClick={() => setContactDialogOpen(false)}
+            >
+              Cancel
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
