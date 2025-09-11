@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 
 // Define the valid username and password combinations securely on the server
 const VALID_CREDENTIALS = [
-  { username: "q", password: "Key" },
+  { username: "eric", password: "Key" },
   { username: "dataPilot2", password: "kitur1" },
   { username: "dea", password: "tradeMaster!456" },
   { username: "dot", password: "ravii" },
