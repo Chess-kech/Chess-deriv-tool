@@ -226,7 +226,7 @@ export default function LoginPage() {
                   className="flex items-center justify-center gap-2 h-11 border-green-500/30 hover:bg-green-500/10 hover:border-green-500/50 transition-all bg-transparent text-green-400"
                 >
                   <MessageCircle className="h-4 w-4" />
-                  <span className="font-medium">WhatsApp</span>
+                  <span className="font-medium">GetloginsWhatsApp</span>
                 </Button>
 
                 {/* Telegram Button */}
