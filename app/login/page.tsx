@@ -10,7 +10,17 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Separator } from "@/components/ui/separator"
-import { Eye, EyeOff, Lock, User, AlertCircle, MessageCircle, Send, TrendingUp } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Eye, EyeOff, Lock, User, AlertCircle, MessageCircle, Send, TrendingUp, FileText } from "lucide-react"
 
 export default function LoginPage() {
   const [username, setUsername] = useState("")
@@ -18,6 +28,8 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [acceptedTerms, setAcceptedTerms] = useState(false)
+  const [termsDialogOpen, setTermsDialogOpen] = useState(false)
   const { login, isAuthenticated } = useAuth()
   const router = useRouter()
 
@@ -29,6 +41,12 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (!acceptedTerms) {
+      setError("You must accept the Terms & Conditions to continue")
+      return
+    }
+
     setIsLoading(true)
     setError("")
 
@@ -43,78 +61,67 @@ export default function LoginPage() {
     setIsLoading(false)
   }
 
-  // Function to open WhatsApp
+  // Enhanced WhatsApp function for better compatibility
   const openWhatsApp = () => {
     const phoneNumber = "254787570246"
-    const message = encodeURIComponent("I would like to purchase deriv analysis tool logins")
+    const message = "I would like to purchase deriv analysis tool logins"
 
-    // WhatsApp URL for web and mobile
-    const whatsappUrl = `https://wa.me/${phoneNumber}?text=${message}`
+    // Different approaches for different environments
+    const userAgent = navigator.userAgent.toLowerCase()
+    const isTikTok = userAgent.includes("tiktok") || userAgent.includes("musically")
+    const isMobile = /android|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent)
 
-    // For mobile devices, try the app protocol first
-    if (/Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-      // Try WhatsApp app protocol
-      const appUrl = `whatsapp://send?phone=${phoneNumber}&text=${message}`
+    if (isTikTok) {
+      // For TikTok app, use direct web URL
+      const whatsappWebUrl = `https://web.whatsapp.com/send?phone=${phoneNumber}&text=${encodeURIComponent(message)}`
+      window.open(whatsappWebUrl, "_blank")
+    } else if (isMobile) {
+      // For mobile browsers, try app first then fallback
+      const whatsappAppUrl = `whatsapp://send?phone=${phoneNumber}&text=${encodeURIComponent(message)}`
+      const whatsappWebUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`
 
-      // Create a temporary link to try opening the app
-      const link = document.createElement("a")
-      link.href = appUrl
-      link.style.display = "none"
-      document.body.appendChild(link)
+      // Try to open the app
+      window.location.href = whatsappAppUrl
 
-      // Try to click the link to open the app
-      try {
-        link.click()
-        // If app doesn't open within 2 seconds, fallback to web
-        setTimeout(() => {
-          window.open(whatsappUrl, "_blank")
-        }, 2000)
-      } catch (error) {
-        // Fallback to web version
-        window.open(whatsappUrl, "_blank")
-      } finally {
-        document.body.removeChild(link)
-      }
+      // Fallback to web after 2 seconds if app doesn't open
+      setTimeout(() => {
+        window.open(whatsappWebUrl, "_blank")
+      }, 2000)
     } else {
-      // Desktop - open web version directly
-      window.open(whatsappUrl, "_blank")
+      // For desktop, use web version
+      const whatsappWebUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`
+      window.open(whatsappWebUrl, "_blank")
     }
   }
 
-  // Function to open Telegram
+  // Enhanced Telegram function for better compatibility
   const openTelegram = () => {
     const phoneNumber = "254787570246"
-    const message = encodeURIComponent("I would like to purchase deriv analysis tool logins")
+    const message = "I would like to purchase deriv analysis tool logins"
 
-    // Telegram URL for web
-    const telegramWebUrl = `https://t.me/+${phoneNumber}?text=${message}`
+    const userAgent = navigator.userAgent.toLowerCase()
+    const isTikTok = userAgent.includes("tiktok") || userAgent.includes("musically")
+    const isMobile = /android|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent)
 
-    // For mobile devices, try the app protocol first
-    if (/Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-      // Try Telegram app protocol
-      const appUrl = `tg://msg?to=+${phoneNumber}&text=${message}`
+    if (isTikTok) {
+      // For TikTok app, use web version
+      const telegramWebUrl = `https://t.me/+${phoneNumber}`
+      window.open(telegramWebUrl, "_blank")
+    } else if (isMobile) {
+      // For mobile browsers, try app first then fallback
+      const telegramAppUrl = `tg://resolve?domain=+${phoneNumber}&text=${encodeURIComponent(message)}`
+      const telegramWebUrl = `https://t.me/+${phoneNumber}`
 
-      // Create a temporary link to try opening the app
-      const link = document.createElement("a")
-      link.href = appUrl
-      link.style.display = "none"
-      document.body.appendChild(link)
+      // Try to open the app
+      window.location.href = telegramAppUrl
 
-      // Try to click the link to open the app
-      try {
-        link.click()
-        // If app doesn't open within 2 seconds, fallback to web
-        setTimeout(() => {
-          window.open(telegramWebUrl, "_blank")
-        }, 2000)
-      } catch (error) {
-        // Fallback to web version
+      // Fallback to web after 2 seconds if app doesn't open
+      setTimeout(() => {
         window.open(telegramWebUrl, "_blank")
-      } finally {
-        document.body.removeChild(link)
-      }
+      }, 2000)
     } else {
-      // Desktop - open web version directly
+      // For desktop, use web version
+      const telegramWebUrl = `https://t.me/+${phoneNumber}`
       window.open(telegramWebUrl, "_blank")
     }
   }
@@ -194,6 +201,162 @@ export default function LoginPage() {
                 </div>
               </div>
 
+              {/* Terms and Conditions Checkbox */}
+              <div className="flex items-start space-x-3 py-2">
+                <Checkbox
+                  id="terms"
+                  checked={acceptedTerms}
+                  onCheckedChange={(checked) => setAcceptedTerms(checked as boolean)}
+                  className="border-white/30 data-[state=checked]:bg-purple-500 data-[state=checked]:border-purple-500"
+                />
+                <div className="grid gap-1.5 leading-none">
+                  <Label htmlFor="terms" className="text-sm font-medium leading-none text-white cursor-pointer">
+                    I agree to the{" "}
+                    <Dialog open={termsDialogOpen} onOpenChange={setTermsDialogOpen}>
+                      <DialogTrigger asChild>
+                        <button type="button" className="text-purple-400 hover:text-purple-300 underline inline">
+                          Terms & Conditions
+                        </button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-2xl max-h-[80vh] bg-slate-900 border-white/20 text-white">
+                        <DialogHeader>
+                          <DialogTitle className="flex items-center gap-2 text-xl font-bold text-purple-400">
+                            <FileText className="h-5 w-5" />
+                            Terms & Conditions for Deriv Analysis Tool Logins
+                          </DialogTitle>
+                          <DialogDescription className="text-gray-300">
+                            Last Updated: 11 September 2025
+                          </DialogDescription>
+                        </DialogHeader>
+                        <ScrollArea className="h-[60vh] pr-4">
+                          <div className="space-y-6 text-sm">
+                            <p className="text-gray-300">
+                              Welcome to DerivAnalysisTool.com. By creating an account and logging in, you agree to
+                              comply with and be bound by the following Terms & Conditions. Please read them carefully
+                              before using our service.
+                            </p>
+
+                            <div className="space-y-4">
+                              <div>
+                                <h3 className="text-lg font-semibold text-purple-400 mb-2">1. Acceptance of Terms</h3>
+                                <p className="text-gray-300">By registering or logging in, you confirm that you:</p>
+                                <ul className="list-disc list-inside mt-2 space-y-1 text-gray-300 ml-4">
+                                  <li>Are at least 18 years old.</li>
+                                  <li>Agree to these Terms & Conditions and our Privacy Policy.</li>
+                                  <li>Will use this tool only for lawful purposes.</li>
+                                </ul>
+                              </div>
+
+                              <div>
+                                <h3 className="text-lg font-semibold text-blue-400 mb-2">2. Account Responsibility</h3>
+                                <ul className="list-disc list-inside space-y-1 text-gray-300 ml-4">
+                                  <li>
+                                    You are responsible for maintaining the confidentiality of your login details
+                                    (username & password).
+                                  </li>
+                                  <li>You agree not to share, sell, or transfer your login credentials.</li>
+                                  <li>Any activity under your account will be considered your responsibility.</li>
+                                </ul>
+                              </div>
+
+                              <div>
+                                <h3 className="text-lg font-semibold text-green-400 mb-2">3. Use of the Tool</h3>
+                                <ul className="list-disc list-inside space-y-1 text-gray-300 ml-4">
+                                  <li>
+                                    The Deriv Analysis Tool provides market analysis and insights but does not guarantee
+                                    profits or prevent losses.
+                                  </li>
+                                  <li>Trading involves risk; you are solely responsible for your trading decisions.</li>
+                                  <li>
+                                    The tool must not be used for fraudulent activities, bots not approved by us, or any
+                                    illegal purpose.
+                                  </li>
+                                </ul>
+                              </div>
+
+                              <div>
+                                <h3 className="text-lg font-semibold text-yellow-400 mb-2">4. Login Access</h3>
+                                <ul className="list-disc list-inside space-y-1 text-gray-300 ml-4">
+                                  <li>
+                                    We reserve the right to suspend or terminate your account if we detect misuse,
+                                    sharing of credentials, or violation of these Terms.
+                                  </li>
+                                  <li>
+                                    Access may be limited or denied at any time without prior notice for security
+                                    reasons.
+                                  </li>
+                                </ul>
+                              </div>
+
+                              <div>
+                                <h3 className="text-lg font-semibold text-red-400 mb-2">5. Payments & Subscriptions</h3>
+                                <ul className="list-disc list-inside space-y-1 text-gray-300 ml-4">
+                                  <li>
+                                    If login access is subscription-based, you agree to pay all applicable fees on time.
+                                  </li>
+                                  <li>
+                                    No refunds will be issued once analysis access has been granted, unless required by
+                                    law.
+                                  </li>
+                                </ul>
+                              </div>
+
+                              <div>
+                                <h3 className="text-lg font-semibold text-orange-400 mb-2">
+                                  6. Limitation of Liability
+                                </h3>
+                                <ul className="list-disc list-inside space-y-1 text-gray-300 ml-4">
+                                  <li>
+                                    We are not responsible for any losses, damages, or liabilities resulting from the
+                                    use of this tool.
+                                  </li>
+                                  <li>
+                                    Analysis results are for educational and informational purposes only, not financial
+                                    advice.
+                                  </li>
+                                </ul>
+                              </div>
+
+                              <div>
+                                <h3 className="text-lg font-semibold text-pink-400 mb-2">7. Changes to Terms</h3>
+                                <p className="text-gray-300">
+                                  We may update these Terms & Conditions at any time. Continued use of the tool means
+                                  you accept any changes.
+                                </p>
+                              </div>
+
+                              <div>
+                                <h3 className="text-lg font-semibold text-cyan-400 mb-2">8. Contact Information</h3>
+                                <p className="text-gray-300 mb-2">
+                                  For any questions about these Terms & Conditions, please contact us at:
+                                </p>
+                                <div className="space-y-1 text-gray-300 ml-4">
+                                  <p>📧 Email: support@derivanalysistool.com</p>
+                                  <p>📞 Phone: +254 787 570246</p>
+                                  <p>🌐 Website: https://derivanalysistool.com</p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </ScrollArea>
+                        <div className="flex justify-end pt-4">
+                          <Button
+                            onClick={() => {
+                              setAcceptedTerms(true)
+                              setTermsDialogOpen(false)
+                            }}
+                            className="bg-purple-600 hover:bg-purple-700"
+                          >
+                            Accept Terms
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </Label>
+                  <p className="text-xs text-gray-400">You must accept our terms to create an account</p>
+                </div>
+              </div>
+
               {error && (
                 <Alert variant="destructive" className="bg-red-500/10 border-red-500/20">
                   <AlertCircle className="h-4 w-4" />
@@ -203,8 +366,8 @@ export default function LoginPage() {
 
               <Button
                 type="submit"
-                className="w-full h-11 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-medium"
-                disabled={isLoading}
+                className="w-full h-11 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-medium disabled:opacity-50"
+                disabled={isLoading || !acceptedTerms}
               >
                 {isLoading ? "Signing in..." : "Sign In"}
               </Button>
@@ -226,7 +389,7 @@ export default function LoginPage() {
                   className="flex items-center justify-center gap-2 h-11 border-green-500/30 hover:bg-green-500/10 hover:border-green-500/50 transition-all bg-transparent text-green-400"
                 >
                   <MessageCircle className="h-4 w-4" />
-                  <span className="font-medium">GetloginsWhatsApp</span>
+                  <span className="font-medium">WhatsApp</span>
                 </Button>
 
                 {/* Telegram Button */}
