@@ -2,18 +2,20 @@ class DerivAPI {
   private ws: WebSocket | null = null
   private isConnected = false
   private reconnectAttempts = 0
-  private maxReconnectAttempts = 5
-  private reconnectDelay = 2000
+  private maxReconnectAttempts = 10
+  private reconnectDelay = 1000
   private subscriptions = new Map<string, (data: any) => void>()
   private messageQueue: any[] = []
   private pingInterval: NodeJS.Timeout | null = null
   private connectionPromise: Promise<void> | null = null
   private forceOffline = false
+  private messageId = 1
 
   // Multiple endpoints for better reliability
   private endpoints = [
     "wss://ws.derivws.com/websockets/v3?app_id=1089",
     "wss://ws.binaryws.com/websockets/v3?app_id=1089",
+    "wss://frontend.derivws.com/websockets/v3?app_id=1089",
   ]
   private currentEndpointIndex = 0
 
@@ -31,6 +33,10 @@ class DerivAPI {
   // Public event handler setters
   onOpen(handler: () => void) {
     this.onOpenHandler = handler
+    // If already connected, call immediately
+    if (this.isConnected) {
+      handler()
+    }
   }
 
   onClose(handler: () => void) {
@@ -58,6 +64,7 @@ class DerivAPI {
   async forceReconnect(): Promise<void> {
     console.log("🔄 Forcing reconnection...")
     this.disconnect()
+    this.reconnectAttempts = 0
     await new Promise((resolve) => setTimeout(resolve, 1000))
     return this.connect()
   }
@@ -78,6 +85,7 @@ class DerivAPI {
         const connectionTimeout = setTimeout(() => {
           console.log("⏰ Connection timeout")
           this.ws?.close()
+          this.tryNextEndpoint()
           reject(new Error("Connection timeout"))
         }, 10000)
 
@@ -149,6 +157,10 @@ class DerivAPI {
     return this.connectionPromise
   }
 
+  private tryNextEndpoint() {
+    this.currentEndpointIndex = (this.currentEndpointIndex + 1) % this.endpoints.length
+  }
+
   // Schedule reconnection with exponential backoff
   private scheduleReconnect() {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
@@ -156,17 +168,12 @@ class DerivAPI {
       return
     }
 
-    const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts)
+    const delay = Math.min(this.reconnectDelay * Math.pow(2, this.reconnectAttempts), 30000)
     console.log(`🔄 Scheduling reconnect in ${delay}ms (attempt ${this.reconnectAttempts + 1})`)
 
     setTimeout(() => {
       this.reconnectAttempts++
-
-      // Try next endpoint if available
-      if (this.reconnectAttempts > 2) {
-        this.currentEndpointIndex = (this.currentEndpointIndex + 1) % this.endpoints.length
-      }
-
+      this.tryNextEndpoint()
       this.connect().catch((error) => {
         console.error("❌ Reconnection failed:", error)
       })
@@ -194,6 +201,7 @@ class DerivAPI {
   private handleMessage(data: any) {
     // Handle pong
     if (data.pong) {
+      console.log("📡 Pong received - connection alive")
       return
     }
 
@@ -202,6 +210,16 @@ class DerivAPI {
       const callback = this.subscriptions.get(data.tick.symbol)
       if (callback) {
         callback(data)
+      }
+      return
+    }
+
+    // Handle history data
+    if (data.history) {
+      const callback = this.subscriptions.get(`history_${data.req_id}`)
+      if (callback) {
+        callback(data)
+        this.subscriptions.delete(`history_${data.req_id}`)
       }
       return
     }
@@ -223,6 +241,15 @@ class DerivAPI {
       return
     }
 
+    // Handle errors
+    if (data.error) {
+      console.error("❌ API Error:", data.error)
+      if (this.onErrorHandler) {
+        this.onErrorHandler(data.error)
+      }
+      return
+    }
+
     // Handle other responses
     console.log("📨 Received message:", data)
   }
@@ -237,6 +264,11 @@ class DerivAPI {
       }
 
       try {
+        // Add message ID for tracking
+        if (!message.req_id) {
+          message.req_id = this.messageId++
+        }
+
         this.ws.send(JSON.stringify(message))
         resolve(message)
       } catch (error) {
@@ -253,8 +285,9 @@ class DerivAPI {
     }
   }
 
-  // Get tick history
+  // Get tick history with proper error handling
   async getTickHistory(symbol: string, count = 1000): Promise<any> {
+    const reqId = this.messageId++
     const message = {
       ticks_history: symbol,
       adjust_start_time: 1,
@@ -262,41 +295,28 @@ class DerivAPI {
       end: "latest",
       start: 1,
       style: "ticks",
+      req_id: reqId,
     }
 
     try {
       await this.send(message)
 
-      // Wait for response
+      // Wait for response with timeout
       return new Promise((resolve, reject) => {
         const timeout = setTimeout(() => {
+          this.subscriptions.delete(`history_${reqId}`)
           reject(new Error("Timeout waiting for tick history"))
         }, 15000)
 
-        const originalOnMessage = this.ws?.onmessage
-        this.ws!.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data)
-            if (data.history) {
-              clearTimeout(timeout)
-              this.ws!.onmessage = originalOnMessage
-              resolve(data)
-            } else if (data.error) {
-              clearTimeout(timeout)
-              this.ws!.onmessage = originalOnMessage
-              reject(new Error(data.error.message))
-            } else {
-              // Call original handler for other messages
-              if (originalOnMessage) {
-                originalOnMessage.call(this.ws, event)
-              }
-            }
-          } catch (error) {
-            clearTimeout(timeout)
-            this.ws!.onmessage = originalOnMessage
-            reject(error)
+        // Set up response handler
+        this.subscriptions.set(`history_${reqId}`, (data) => {
+          clearTimeout(timeout)
+          if (data.error) {
+            reject(new Error(data.error.message))
+          } else {
+            resolve(data)
           }
-        }
+        })
       })
     } catch (error) {
       console.error("❌ Error getting tick history:", error)
@@ -304,7 +324,7 @@ class DerivAPI {
     }
   }
 
-  // Subscribe to ticks
+  // Subscribe to ticks with proper error handling
   async subscribeTicks(symbol: string, callback: (data: any) => void): Promise<void> {
     this.subscriptions.set(symbol, callback)
 
@@ -318,6 +338,7 @@ class DerivAPI {
       console.log(`✅ Subscribed to ${symbol}`)
     } catch (error) {
       console.error(`❌ Error subscribing to ${symbol}:`, error)
+      this.subscriptions.delete(symbol)
       throw error
     }
   }
@@ -374,6 +395,7 @@ class DerivAPI {
       reconnectAttempts: this.reconnectAttempts,
       currentEndpoint: this.endpoints[this.currentEndpointIndex],
       subscriptions: Array.from(this.subscriptions.keys()),
+      wsReadyState: this.ws?.readyState,
     }
   }
 

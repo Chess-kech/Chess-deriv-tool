@@ -5,107 +5,107 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/components/auth-provider"
+import { PremiumSignalsDashboard } from "@/components/premium-signals-dashboard"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Shield, Lock, AlertTriangle } from "lucide-react"
-import { PremiumSignalsDashboard } from "@/components/premium-signals-dashboard"
+import { Lock, Shield, AlertCircle } from "lucide-react"
 
 export default function PremiumSignalsPage() {
-  const [password, setPassword] = useState("")
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [premiumPassword, setPremiumPassword] = useState("")
+  const [isPremiumAuthenticated, setIsPremiumAuthenticated] = useState(false)
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
-  const { isLoggedIn } = useAuth()
+  const { isAuthenticated } = useAuth()
   const router = useRouter()
 
-  // Check if user is logged into main app
   useEffect(() => {
-    if (!isLoggedIn) {
+    if (!isAuthenticated) {
       router.push("/login")
     }
-  }, [isLoggedIn, router])
+  }, [isAuthenticated, router])
 
-  const handlePasswordSubmit = (e: React.FormEvent) => {
+  const handlePremiumLogin = (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setError("")
 
-    // Simulate authentication delay
-    setTimeout(() => {
-      if (password === "adminderiv") {
-        setIsAuthenticated(true)
-        setError("")
-      } else {
-        setError("Invalid password. Access denied.")
-      }
-      setIsLoading(false)
-    }, 1000)
-  }
+    // Check premium password
+    if (premiumPassword === "adminderiv") {
+      setIsPremiumAuthenticated(true)
+      setError("")
+    } else {
+      setError("Invalid premium password")
+    }
 
-  if (!isLoggedIn) {
-    return null // Will redirect to login
+    setIsLoading(false)
   }
 
   if (!isAuthenticated) {
+    return null // Will redirect to login
+  }
+
+  if (!isPremiumAuthenticated) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-950 to-gray-900 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md bg-gray-900/80 border-red-500/30">
-          <CardHeader className="text-center">
-            <div className="flex justify-center mb-4">
-              <div className="p-3 rounded-full bg-red-500/20">
-                <Shield className="h-8 w-8 text-red-500" />
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md shadow-xl border-white/20 bg-white/10 backdrop-blur-xl">
+          <CardHeader className="text-center space-y-2">
+            <div className="flex justify-center">
+              <div className="w-16 h-16 bg-gradient-to-br from-yellow-500 to-orange-500 rounded-full flex items-center justify-center">
+                <Shield className="h-8 w-8 text-white" />
               </div>
             </div>
-            <CardTitle className="text-2xl font-bold text-white">Premium Signals Access</CardTitle>
-            <p className="text-gray-400 mt-2">Restricted Area - Authorization Required</p>
+            <CardTitle className="text-2xl font-bold text-white">Premium Signals</CardTitle>
+            <p className="text-gray-300">Enter premium password to access advanced trading signals</p>
           </CardHeader>
           <CardContent>
-            <Alert className="mb-6 border-yellow-500/50 bg-yellow-500/10">
-              <AlertTriangle className="h-4 w-4 text-yellow-500" />
-              <AlertDescription className="text-yellow-200">
-                <strong>Security Notice:</strong> This area contains premium trading signals. Only authorized personnel
-                with the correct password may access this content.
-              </AlertDescription>
-            </Alert>
-
-            <form onSubmit={handlePasswordSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="password" className="text-white">
-                  Access Password
+            <form onSubmit={handlePremiumLogin} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="premium-password" className="text-white">
+                  Premium Password
                 </Label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
-                    id="password"
+                    id="premium-password"
                     type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter premium access password"
-                    className="pl-10 bg-gray-800 border-gray-600 text-white placeholder-gray-400"
+                    placeholder="Enter premium password"
+                    value={premiumPassword}
+                    onChange={(e) => setPremiumPassword(e.target.value)}
+                    className="pl-10 h-11 bg-white/10 border-white/20 text-white placeholder:text-gray-400"
                     required
                   />
                 </div>
               </div>
 
               {error && (
-                <Alert className="border-red-500/50 bg-red-500/10">
-                  <AlertTriangle className="h-4 w-4 text-red-500" />
-                  <AlertDescription className="text-red-200">{error}</AlertDescription>
+                <Alert variant="destructive" className="bg-red-500/10 border-red-500/20">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription className="text-red-400">{error}</AlertDescription>
                 </Alert>
               )}
 
-              <Button type="submit" className="w-full bg-red-600 hover:bg-red-700 text-white" disabled={isLoading}>
+              <Button
+                type="submit"
+                className="w-full h-11 bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-700 hover:to-orange-700 text-white font-medium"
+                disabled={isLoading}
+              >
                 {isLoading ? "Verifying..." : "Access Premium Signals"}
               </Button>
             </form>
 
-            <div className="mt-6 text-center">
-              <Button variant="ghost" onClick={() => router.push("/")} className="text-gray-400 hover:text-white">
-                ← Back to Main Dashboard
-              </Button>
+            <div className="mt-6 p-4 bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-blue-500/30 rounded-lg">
+              <div className="text-center">
+                <p className="text-blue-400 font-semibold">Premium Features</p>
+                <ul className="text-xs text-gray-300 mt-2 space-y-1">
+                  <li>• Advanced trading signals with 85-97% accuracy</li>
+                  <li>• Real-time market analysis</li>
+                  <li>• Live digit pattern recognition</li>
+                  <li>• Sound notifications for new signals</li>
+                </ul>
+              </div>
             </div>
           </CardContent>
         </Card>
