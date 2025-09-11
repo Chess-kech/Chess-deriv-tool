@@ -20,7 +20,20 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Eye, EyeOff, Lock, User, AlertCircle, MessageCircle, Send, TrendingUp, FileText } from "lucide-react"
+import {
+  Eye,
+  EyeOff,
+  Lock,
+  User,
+  AlertCircle,
+  MessageCircle,
+  Send,
+  TrendingUp,
+  FileText,
+  Copy,
+  ExternalLink,
+} from "lucide-react"
+import { toast } from "sonner"
 
 export default function LoginPage() {
   const [username, setUsername] = useState("")
@@ -30,6 +43,8 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [acceptedTerms, setAcceptedTerms] = useState(false)
   const [termsDialogOpen, setTermsDialogOpen] = useState(false)
+  const [contactDialogOpen, setContactDialogOpen] = useState(false)
+  const [contactType, setContactType] = useState<"whatsapp" | "telegram">("whatsapp")
   const { login, isAuthenticated } = useAuth()
   const router = useRouter()
 
@@ -61,68 +76,75 @@ export default function LoginPage() {
     setIsLoading(false)
   }
 
-  // Enhanced WhatsApp function for better compatibility
+  // Copy text to clipboard
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        toast.success("Copied to clipboard!")
+      })
+      .catch(() => {
+        toast.error("Failed to copy")
+      })
+  }
+
+  // Check if we're in TikTok or other restricted environment
+  const isRestrictedEnvironment = () => {
+    const userAgent = navigator.userAgent.toLowerCase()
+    return (
+      userAgent.includes("tiktok") ||
+      userAgent.includes("musically") ||
+      userAgent.includes("instagram") ||
+      userAgent.includes("facebook") ||
+      userAgent.includes("twitter")
+    )
+  }
+
+  // Enhanced WhatsApp function with fallback for restricted environments
   const openWhatsApp = () => {
-    const phoneNumber = "254787570246"
+    const phoneNumber = "+254 787 570246"
     const message = "I would like to purchase deriv analysis tool logins"
 
-    // Different approaches for different environments
-    const userAgent = navigator.userAgent.toLowerCase()
-    const isTikTok = userAgent.includes("tiktok") || userAgent.includes("musically")
-    const isMobile = /android|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent)
+    if (isRestrictedEnvironment()) {
+      // Show contact dialog instead of trying to redirect
+      setContactType("whatsapp")
+      setContactDialogOpen(true)
+      return
+    }
 
-    if (isTikTok) {
-      // For TikTok app, use direct web URL
-      const whatsappWebUrl = `https://web.whatsapp.com/send?phone=${phoneNumber}&text=${encodeURIComponent(message)}`
-      window.open(whatsappWebUrl, "_blank")
-    } else if (isMobile) {
-      // For mobile browsers, try app first then fallback
-      const whatsappAppUrl = `whatsapp://send?phone=${phoneNumber}&text=${encodeURIComponent(message)}`
-      const whatsappWebUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`
+    // Try normal redirect for unrestricted environments
+    const whatsappUrl = `https://wa.me/254787570246?text=${encodeURIComponent(message)}`
 
-      // Try to open the app
-      window.location.href = whatsappAppUrl
-
-      // Fallback to web after 2 seconds if app doesn't open
-      setTimeout(() => {
-        window.open(whatsappWebUrl, "_blank")
-      }, 2000)
-    } else {
-      // For desktop, use web version
-      const whatsappWebUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`
-      window.open(whatsappWebUrl, "_blank")
+    try {
+      window.open(whatsappUrl, "_blank")
+    } catch (error) {
+      // Fallback to contact dialog if redirect fails
+      setContactType("whatsapp")
+      setContactDialogOpen(true)
     }
   }
 
-  // Enhanced Telegram function for better compatibility
+  // Enhanced Telegram function with fallback for restricted environments
   const openTelegram = () => {
-    const phoneNumber = "254787570246"
+    const phoneNumber = "+254 787 570246"
     const message = "I would like to purchase deriv analysis tool logins"
 
-    const userAgent = navigator.userAgent.toLowerCase()
-    const isTikTok = userAgent.includes("tiktok") || userAgent.includes("musically")
-    const isMobile = /android|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent)
+    if (isRestrictedEnvironment()) {
+      // Show contact dialog instead of trying to redirect
+      setContactType("telegram")
+      setContactDialogOpen(true)
+      return
+    }
 
-    if (isTikTok) {
-      // For TikTok app, use web version
-      const telegramWebUrl = `https://t.me/+${phoneNumber}`
-      window.open(telegramWebUrl, "_blank")
-    } else if (isMobile) {
-      // For mobile browsers, try app first then fallback
-      const telegramAppUrl = `tg://resolve?domain=+${phoneNumber}&text=${encodeURIComponent(message)}`
-      const telegramWebUrl = `https://t.me/+${phoneNumber}`
+    // Try normal redirect for unrestricted environments
+    const telegramUrl = `https://t.me/+254787570246`
 
-      // Try to open the app
-      window.location.href = telegramAppUrl
-
-      // Fallback to web after 2 seconds if app doesn't open
-      setTimeout(() => {
-        window.open(telegramWebUrl, "_blank")
-      }, 2000)
-    } else {
-      // For desktop, use web version
-      const telegramWebUrl = `https://t.me/+${phoneNumber}`
-      window.open(telegramWebUrl, "_blank")
+    try {
+      window.open(telegramUrl, "_blank")
+    } catch (error) {
+      // Fallback to contact dialog if redirect fails
+      setContactType("telegram")
+      setContactDialogOpen(true)
     }
   }
 
@@ -423,6 +445,101 @@ export default function LoginPage() {
           <p>© 2024 Deriv Analysis Platform. All rights reserved.</p>
         </div>
       </div>
+
+      {/* Contact Information Dialog */}
+      <Dialog open={contactDialogOpen} onOpenChange={setContactDialogOpen}>
+        <DialogContent className="max-w-md bg-slate-900 border-white/20 text-white">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-xl font-bold">
+              {contactType === "whatsapp" ? (
+                <>
+                  <MessageCircle className="h-5 w-5 text-green-400" />
+                  <span className="text-green-400">WhatsApp Contact</span>
+                </>
+              ) : (
+                <>
+                  <Send className="h-5 w-5 text-blue-400" />
+                  <span className="text-blue-400">Telegram Contact</span>
+                </>
+              )}
+            </DialogTitle>
+            <DialogDescription className="text-gray-300">
+              {isRestrictedEnvironment()
+                ? "External links are blocked in this app. Please copy the contact details below:"
+                : "Contact us directly using the information below:"}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Phone Number */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-gray-300">Phone Number:</Label>
+              <div className="flex items-center gap-2 p-3 bg-white/5 rounded-lg border border-white/10">
+                <span className="text-white font-mono">+254 787 570246</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => copyToClipboard("+254 787 570246")}
+                  className="ml-auto h-8 w-8 p-0 hover:bg-white/10"
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Message */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-gray-300">Message to send:</Label>
+              <div className="flex items-start gap-2 p-3 bg-white/5 rounded-lg border border-white/10">
+                <span className="text-white text-sm flex-1">I would like to purchase deriv analysis tool logins</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => copyToClipboard("I would like to purchase deriv analysis tool logins")}
+                  className="h-8 w-8 p-0 hover:bg-white/10 flex-shrink-0"
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Instructions */}
+            <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+              <p className="text-sm text-blue-300">
+                <strong>Instructions:</strong>
+              </p>
+              <ol className="text-sm text-gray-300 mt-2 space-y-1 list-decimal list-inside">
+                <li>Copy the phone number above</li>
+                <li>Open {contactType === "whatsapp" ? "WhatsApp" : "Telegram"} on your device</li>
+                <li>Start a new chat with the copied number</li>
+                <li>Copy and send the message above</li>
+              </ol>
+            </div>
+
+            {/* Try Direct Link Button (for non-restricted environments) */}
+            {!isRestrictedEnvironment() && (
+              <div className="pt-2">
+                <Button
+                  onClick={() => {
+                    const url =
+                      contactType === "whatsapp"
+                        ? `https://wa.me/254787570246?text=${encodeURIComponent("I would like to purchase deriv analysis tool logins")}`
+                        : `https://t.me/+254787570246`
+                    window.open(url, "_blank")
+                    setContactDialogOpen(false)
+                  }}
+                  className={`w-full ${
+                    contactType === "whatsapp" ? "bg-green-600 hover:bg-green-700" : "bg-blue-600 hover:bg-blue-700"
+                  }`}
+                >
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  Open {contactType === "whatsapp" ? "WhatsApp" : "Telegram"}
+                </Button>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
