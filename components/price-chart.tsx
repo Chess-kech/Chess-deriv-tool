@@ -215,7 +215,7 @@ export default function PriceChart({
           )}
 
           {/* Watermark */}
-          <div className="absolute bottom-2 right-4 text-xs opacity-50">Real Chart</div>
+          <div className="absolute bottom-2 right-4 text-xs opacity-50">Demo Chart</div>
         </div>
       )}
     </Card>
