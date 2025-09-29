@@ -429,4 +429,6 @@ class DerivAPI {
 // Create singleton instance
 const derivAPI = new DerivAPI()
 
+// Export both the class and the singleton instance
+export { DerivAPI }
 export default derivAPI
