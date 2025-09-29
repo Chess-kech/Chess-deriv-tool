@@ -108,21 +108,21 @@ const _0xDISABLE = () => {
 
 // Map of volatility symbols to their display names
 const volatilitySymbols = {
-  "1HZ10V": { name: "Volatility 10 (1s) Index", code: "10", speed: "1s" },
-  "1HZ15V": { name: "Volatility 15 (1s) Index", code: "15", speed: "1s" },
-  "1HZ25V": { name: "Volatility 25 (1s) Index", code: "25", speed: "1s" },
-  "1HZ50V": { name: "Volatility 50 (1s) Index", code: "50", speed: "1s" },
-  "1HZ75V": { name: "Volatility 75 (1s) Index", code: "75", speed: "1s" },
-  "1HZ100V": { name: "Volatility 100 (1s) Index", code: "100", speed: "1s" },
-  "1HZ150V": { name: "Volatility 150 (1s) Index", code: "150", speed: "1s" },
-  "1HZ200V": { name: "Volatility 200 (1s) Index", code: "200", speed: "1s" },
-  "1HZ250V": { name: "Volatility 250 (1s) Index", code: "250", speed: "1s" },
+  "1HZ10V": { name: "Volatility 10 (1s) Index", code: "10", speed: "1s", baseValue: 156.92 },
+  "1HZ15V": { name: "Volatility 15 (1s) Index", code: "15", speed: "1s", baseValue: 234.78 },
+  "1HZ25V": { name: "Volatility 25 (1s) Index", code: "25", speed: "1s", baseValue: 312.74 },
+  "1HZ50V": { name: "Volatility 50 (1s) Index", code: "50", speed: "1s", baseValue: 421.56 },
+  "1HZ75V": { name: "Volatility 75 (1s) Index", code: "75", speed: "1s", baseValue: 542.18 },
+  "1HZ100V": { name: "Volatility 100 (1s) Index", code: "100", speed: "1s", baseValue: 683.31 },
+  "1HZ150V": { name: "Volatility 150 (1s) Index", code: "150", speed: "1s", baseValue: 892.45 },
+  "1HZ200V": { name: "Volatility 200 (1s) Index", code: "200", speed: "1s", baseValue: 1124.67 },
+  "1HZ250V": { name: "Volatility 250 (1s) Index", code: "250", speed: "1s", baseValue: 1387.92 },
 }
 
 const strategies = ["Matches", "Differs", "Even/Odd", "Over/Under"]
 
 export function DigitFlowAnalyzer() {
-  const [currentValue, setCurrentValue] = useState("0.00")
+  const [currentValue, setCurrentValue] = useState("717.19")
   const [volatilitySymbol, setVolatilitySymbol] = useState("1HZ100V")
   const [volatilityName, setVolatilityName] = useState("Volatility 100 (1s) Index")
   const [strategy, setStrategy] = useState("Matches")
@@ -138,19 +138,19 @@ export function DigitFlowAnalyzer() {
   const [isLoading, setIsLoading] = useState(false)
   const [connectionStatus, setConnectionStatus] = useState<"connecting" | "connected" | "disconnected">("connecting")
   const [digitData, setDigitData] = useState([
-    { digit: 0, percentage: 10.0 },
-    { digit: 1, percentage: 10.0 },
-    { digit: 2, percentage: 10.0 },
-    { digit: 3, percentage: 10.0 },
-    { digit: 4, percentage: 10.0 },
-    { digit: 5, percentage: 10.0 },
-    { digit: 6, percentage: 10.0 },
-    { digit: 7, percentage: 10.0 },
-    { digit: 8, percentage: 10.0 },
-    { digit: 9, percentage: 10.0 },
+    { digit: 0, percentage: 8.91 },
+    { digit: 1, percentage: 8.87 },
+    { digit: 2, percentage: 11.14 },
+    { digit: 3, percentage: 8.16 },
+    { digit: 4, percentage: 9.03 },
+    { digit: 5, percentage: 5.07 },
+    { digit: 6, percentage: 6.27 },
+    { digit: 7, percentage: 12.27 },
+    { digit: 8, percentage: 8.09 },
+    { digit: 9, percentage: 7.54 },
   ])
-  const [overPercentage, setOverPercentage] = useState(50)
-  const [underPercentage, setUnderPercentage] = useState(50)
+  const [overPercentage, setOverPercentage] = useState(48)
+  const [underPercentage, setUnderPercentage] = useState(52)
   const [recentDigits, setRecentDigits] = useState<number[]>([])
   const [selectedOverUnder, setSelectedOverUnder] = useState<"over" | "under" | null>(null)
   const [selectedNumber, setSelectedNumber] = useState<number | null>(null)
@@ -176,6 +176,7 @@ export function DigitFlowAnalyzer() {
   const [lastTickTime, setLastTickTime] = useState<Date | null>(null)
   const [tickCount, setTickCount] = useState(0)
   const [isChangingVolatility, setIsChangingVolatility] = useState(false)
+  const [stablePriceForVolatility, setStablePriceForVolatility] = useState<{ [key: string]: string }>({})
 
   // Effect to update percentages when prediction changes
   useEffect(() => {
@@ -380,10 +381,14 @@ export function DigitFlowAnalyzer() {
         // Calculate digit frequencies from real data
         updateDigitPercentagesFromDigits(digits)
 
-        // Set current price
+        // Set current price and store stable price for this volatility
         if (prices.length > 0) {
           const currentPrice = String(prices[prices.length - 1])
           setCurrentValue(currentPrice)
+          setStablePriceForVolatility((prev) => ({
+            ...prev,
+            [volatilitySymbol]: currentPrice,
+          }))
           setLastTickTime(new Date())
         }
 
@@ -418,6 +423,10 @@ export function DigitFlowAnalyzer() {
           console.log("📈 Live tick received:", priceStr)
 
           setCurrentValue(priceStr)
+          setStablePriceForVolatility((prev) => ({
+            ...prev,
+            [volatilitySymbol]: priceStr,
+          }))
           setLastTickTime(new Date())
           setTickCount((prev) => prev + 1)
 
@@ -452,35 +461,24 @@ export function DigitFlowAnalyzer() {
       clearInterval(tickIntervalRef.current)
     }
 
-    // Get a realistic starting price based on volatility
+    // Get the base price for the selected volatility
     const volatilityInfo = volatilitySymbols[volatilitySymbol as keyof typeof volatilitySymbols]
-    const volatilityLevel = volatilityInfo ? Number.parseInt(volatilityInfo.code) : 100
+    const basePrice = volatilityInfo ? volatilityInfo.baseValue : 717.19
 
-    // Base prices for different volatilities (realistic ranges)
-    const basePrices = {
-      10: 150 + Math.random() * 50, // 150-200
-      15: 200 + Math.random() * 100, // 200-300
-      25: 300 + Math.random() * 150, // 300-450
-      50: 400 + Math.random() * 200, // 400-600
-      75: 500 + Math.random() * 250, // 500-750
-      100: 600 + Math.random() * 300, // 600-900
-      150: 800 + Math.random() * 400, // 800-1200
-      200: 1000 + Math.random() * 500, // 1000-1500
-      250: 1200 + Math.random() * 600, // 1200-1800
-    }
-
-    const basePrice = basePrices[volatilityLevel as keyof typeof basePrices] || 717.19
+    // Use stable price if available, otherwise use base price
+    const startPrice = stablePriceForVolatility[volatilitySymbol]
+      ? Number.parseFloat(stablePriceForVolatility[volatilitySymbol])
+      : basePrice
 
     // Set initial price
-    setCurrentValue(basePrice.toFixed(2))
+    setCurrentValue(startPrice.toFixed(2))
 
     // Generate initial price history
     const initialPrices = []
-    let currentPrice = basePrice
+    let currentPrice = startPrice
 
     for (let i = 0; i < 100; i++) {
-      const volatilityFactor = volatilityLevel / 100
-      const change = (Math.random() - 0.5) * volatilityFactor * 2
+      const change = (Math.random() - 0.5) * 0.5
       currentPrice += change
       initialPrices.push(currentPrice)
     }
@@ -504,14 +502,17 @@ export function DigitFlowAnalyzer() {
     tickIntervalRef.current = setInterval(() => {
       if (isChangingVolatility) return // Don't update if changing volatility
 
-      const volatilityFactor = volatilityLevel / 100
-      const trend = (Math.random() - 0.5) * 0.1
-      const randomOffset = (Math.random() - 0.5 + trend) * volatilityFactor * 1.5
+      const trend = lastPrice > startPrice ? -0.1 : 0.1
+      const randomOffset = (Math.random() - 0.5 + trend) * 0.4
       const newPrice = lastPrice + randomOffset
       lastPrice = newPrice
 
       const formattedPrice = newPrice.toFixed(2)
       setCurrentValue(formattedPrice)
+      setStablePriceForVolatility((prev) => ({
+        ...prev,
+        [volatilitySymbol]: formattedPrice,
+      }))
       setLastTickTime(new Date())
 
       // Update price history
@@ -726,7 +727,7 @@ export function DigitFlowAnalyzer() {
     return { recommendation, confidence: Math.round(confidence), details }
   }
 
-  // Handle volatility change with proper live data fetching
+  // Handle volatility change with stable price transition
   const handleVolatilityChange = async (symbol: string) => {
     setIsChangingVolatility(true)
     setPriceTransitioning(true)
@@ -750,6 +751,15 @@ export function DigitFlowAnalyzer() {
     const volatilityInfo = volatilitySymbols[symbol as keyof typeof volatilitySymbols]
     if (volatilityInfo) {
       setVolatilityName(volatilityInfo.name)
+    }
+
+    // Set stable price immediately if we have it
+    if (stablePriceForVolatility[symbol]) {
+      setCurrentValue(stablePriceForVolatility[symbol])
+    } else {
+      // Use base value temporarily
+      const baseValue = volatilityInfo?.baseValue || 717.19
+      setCurrentValue(baseValue.toFixed(2))
     }
 
     // Reset analysis data
