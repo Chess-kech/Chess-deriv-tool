@@ -2,17 +2,16 @@ class DerivAPI {
   private ws: WebSocket | null = null
   private isConnected = false
   private reconnectAttempts = 0
-  private maxReconnectAttempts = 5
-  private reconnectDelay = 2000
+  private maxReconnectAttempts = 10
+  private reconnectDelay = 1000
   private subscriptions = new Map<string, (data: any) => void>()
   private messageQueue: any[] = []
   private pingInterval: NodeJS.Timeout | null = null
   private connectionPromise: Promise<void> | null = null
   private forceOffline = false
   private messageId = 1
-  private connectionTimeout: NodeJS.Timeout | null = null
 
-  // Updated endpoints with better reliability
+  // Multiple endpoints for better reliability
   private endpoints = [
     "wss://ws.derivws.com/websockets/v3?app_id=1089",
     "wss://ws.binaryws.com/websockets/v3?app_id=1089",
@@ -28,7 +27,7 @@ class DerivAPI {
   private onBalanceHandler: ((balance: any) => void) | null = null
 
   constructor() {
-    // Don't auto-connect in constructor, let components control connection
+    this.connect()
   }
 
   // Public event handler setters
@@ -71,14 +70,9 @@ class DerivAPI {
   }
 
   // Connect to WebSocket
-  async connect(): Promise<void> {
+  private async connect(): Promise<void> {
     if (this.connectionPromise) {
       return this.connectionPromise
-    }
-
-    if (this.isConnected && this.ws?.readyState === WebSocket.OPEN) {
-      console.log("✅ Already connected")
-      return Promise.resolve()
     }
 
     this.connectionPromise = new Promise((resolve, reject) => {
@@ -86,31 +80,18 @@ class DerivAPI {
         const endpoint = this.endpoints[this.currentEndpointIndex]
         console.log(`🔗 Connecting to Deriv API: ${endpoint}`)
 
-        // Clear any existing connection
-        if (this.ws) {
-          this.ws.close()
-          this.ws = null
-        }
-
         this.ws = new WebSocket(endpoint)
 
-        // Set connection timeout
-        this.connectionTimeout = setTimeout(() => {
+        const connectionTimeout = setTimeout(() => {
           console.log("⏰ Connection timeout")
-          if (this.ws) {
-            this.ws.close()
-          }
+          this.ws?.close()
           this.tryNextEndpoint()
           reject(new Error("Connection timeout"))
-        }, 15000) // 15 second timeout
+        }, 10000)
 
         this.ws.onopen = () => {
-          if (this.connectionTimeout) {
-            clearTimeout(this.connectionTimeout)
-            this.connectionTimeout = null
-          }
-
-          console.log("✅ Connected to Deriv API successfully")
+          clearTimeout(connectionTimeout)
+          console.log("✅ Connected to Deriv API")
           this.isConnected = true
           this.reconnectAttempts = 0
           this.currentEndpointIndex = 0 // Reset to primary endpoint
@@ -129,11 +110,7 @@ class DerivAPI {
         }
 
         this.ws.onclose = (event) => {
-          if (this.connectionTimeout) {
-            clearTimeout(this.connectionTimeout)
-            this.connectionTimeout = null
-          }
-
+          clearTimeout(connectionTimeout)
           console.log("❌ Disconnected from Deriv API", event.code, event.reason)
           this.isConnected = false
           this.stopPing()
@@ -142,8 +119,8 @@ class DerivAPI {
             this.onCloseHandler()
           }
 
-          // Auto-reconnect if not manually closed and not at max attempts
-          if (!this.forceOffline && event.code !== 1000 && this.reconnectAttempts < this.maxReconnectAttempts) {
+          // Auto-reconnect if not manually closed
+          if (!this.forceOffline && event.code !== 1000) {
             this.scheduleReconnect()
           }
 
@@ -151,13 +128,8 @@ class DerivAPI {
         }
 
         this.ws.onerror = (error) => {
-          if (this.connectionTimeout) {
-            clearTimeout(this.connectionTimeout)
-            this.connectionTimeout = null
-          }
-
+          clearTimeout(connectionTimeout)
           console.error("🔥 WebSocket error:", error)
-          this.isConnected = false
 
           if (this.onErrorHandler) {
             this.onErrorHandler(error)
@@ -187,7 +159,6 @@ class DerivAPI {
 
   private tryNextEndpoint() {
     this.currentEndpointIndex = (this.currentEndpointIndex + 1) % this.endpoints.length
-    console.log(`🔄 Trying next endpoint: ${this.endpoints[this.currentEndpointIndex]}`)
   }
 
   // Schedule reconnection with exponential backoff
@@ -211,15 +182,9 @@ class DerivAPI {
 
   // Start ping mechanism
   private startPing() {
-    if (this.pingInterval) {
-      clearInterval(this.pingInterval)
-    }
-
     this.pingInterval = setInterval(() => {
       if (this.isConnected && this.ws?.readyState === WebSocket.OPEN) {
-        this.send({ ping: 1 }).catch(() => {
-          console.log("❌ Ping failed")
-        })
+        this.send({ ping: 1 })
       }
     }, 30000) // Ping every 30 seconds
   }
@@ -295,7 +260,6 @@ class DerivAPI {
       if (!this.isConnected || this.ws?.readyState !== WebSocket.OPEN) {
         // Queue message for later
         this.messageQueue.push({ message, resolve, reject })
-        console.log("📤 Message queued (not connected)")
         return
       }
 
@@ -305,12 +269,9 @@ class DerivAPI {
           message.req_id = this.messageId++
         }
 
-        const messageStr = JSON.stringify(message)
-        console.log("📤 Sending message:", messageStr)
-        this.ws.send(messageStr)
+        this.ws.send(JSON.stringify(message))
         resolve(message)
       } catch (error) {
-        console.error("❌ Error sending message:", error)
         reject(error)
       }
     })
@@ -318,7 +279,6 @@ class DerivAPI {
 
   // Process queued messages
   private processMessageQueue() {
-    console.log(`📦 Processing ${this.messageQueue.length} queued messages`)
     while (this.messageQueue.length > 0) {
       const { message, resolve, reject } = this.messageQueue.shift()
       this.send(message).then(resolve).catch(reject)
@@ -338,8 +298,6 @@ class DerivAPI {
       req_id: reqId,
     }
 
-    console.log(`📊 Requesting tick history for ${symbol} (${count} ticks)`)
-
     try {
       await this.send(message)
 
@@ -348,16 +306,14 @@ class DerivAPI {
         const timeout = setTimeout(() => {
           this.subscriptions.delete(`history_${reqId}`)
           reject(new Error("Timeout waiting for tick history"))
-        }, 20000) // 20 second timeout
+        }, 15000)
 
         // Set up response handler
         this.subscriptions.set(`history_${reqId}`, (data) => {
           clearTimeout(timeout)
           if (data.error) {
-            console.error("❌ History error:", data.error)
             reject(new Error(data.error.message))
           } else {
-            console.log(`✅ Received ${data.history?.prices?.length || 0} price points for ${symbol}`)
             resolve(data)
           }
         })
@@ -370,7 +326,6 @@ class DerivAPI {
 
   // Subscribe to ticks with proper error handling
   async subscribeTicks(symbol: string, callback: (data: any) => void): Promise<void> {
-    console.log(`🔔 Subscribing to ticks for ${symbol}`)
     this.subscriptions.set(symbol, callback)
 
     const message = {
@@ -380,7 +335,7 @@ class DerivAPI {
 
     try {
       await this.send(message)
-      console.log(`✅ Successfully subscribed to ${symbol}`)
+      console.log(`✅ Subscribed to ${symbol}`)
     } catch (error) {
       console.error(`❌ Error subscribing to ${symbol}:`, error)
       this.subscriptions.delete(symbol)
@@ -390,7 +345,6 @@ class DerivAPI {
 
   // Unsubscribe from ticks
   async unsubscribeTicks(symbol: string): Promise<void> {
-    console.log(`🔕 Unsubscribing from ${symbol}`)
     this.subscriptions.delete(symbol)
 
     const message = {
@@ -442,40 +396,6 @@ class DerivAPI {
       currentEndpoint: this.endpoints[this.currentEndpointIndex],
       subscriptions: Array.from(this.subscriptions.keys()),
       wsReadyState: this.ws?.readyState,
-      wsReadyStateText: this.getReadyStateText(),
-      messageQueueLength: this.messageQueue.length,
-    }
-  }
-
-  private getReadyStateText(): string {
-    if (!this.ws) return "No WebSocket"
-    switch (this.ws.readyState) {
-      case WebSocket.CONNECTING:
-        return "CONNECTING"
-      case WebSocket.OPEN:
-        return "OPEN"
-      case WebSocket.CLOSING:
-        return "CLOSING"
-      case WebSocket.CLOSED:
-        return "CLOSED"
-      default:
-        return "UNKNOWN"
-    }
-  }
-
-  // Test connection
-  async testConnection(): Promise<boolean> {
-    try {
-      if (!this.isConnected) {
-        await this.connect()
-      }
-
-      // Send a ping to test
-      await this.send({ ping: 1 })
-      return true
-    } catch (error) {
-      console.error("❌ Connection test failed:", error)
-      return false
     }
   }
 
@@ -496,12 +416,6 @@ class DerivAPI {
     this.forceOffline = true
     this.stopPing()
     this.subscriptions.clear()
-    this.messageQueue.length = 0
-
-    if (this.connectionTimeout) {
-      clearTimeout(this.connectionTimeout)
-      this.connectionTimeout = null
-    }
 
     if (this.ws) {
       this.ws.close(1000, "Manual disconnect")
@@ -509,7 +423,6 @@ class DerivAPI {
     }
 
     this.isConnected = false
-    this.connectionPromise = null
   }
 }
 
