@@ -1,545 +1,677 @@
 "use client"
 
 import type React from "react"
+
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { useAuth } from "@/components/auth-provider"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Separator } from "@/components/ui/separator"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Checkbox } from "@/components/ui/checkbox"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { useAuth } from "@/components/auth-provider"
+import { useTheme } from "next-themes"
+import { cn } from "@/lib/utils"
 import {
-  Eye,
-  EyeOff,
-  Lock,
-  User,
-  AlertCircle,
+  Phone,
   MessageCircle,
-  Send,
-  TrendingUp,
-  FileText,
   Copy,
+  Check,
+  AlertTriangle,
+  Shield,
+  FileText,
+  Users,
+  Lock,
+  Globe,
+  CreditCard,
+  Loader2,
   ExternalLink,
+  Info,
+  Crown,
+  Zap,
+  TrendingUp,
+  BarChart3,
+  Target,
 } from "lucide-react"
-import { toast } from "sonner"
+import { AmericanFlag } from "@/components/american-flag"
+
+// Detect if running in TikTok or other restricted environments
+const isRestrictedEnvironment = () => {
+  if (typeof window === "undefined") return false
+
+  const userAgent = navigator.userAgent.toLowerCase()
+  const restrictedApps = [
+    "tiktok",
+    "bytedance",
+    "musically",
+    "instagram",
+    "facebook",
+    "fbav",
+    "fban",
+    "twitter",
+    "snapchat",
+  ]
+
+  return restrictedApps.some((app) => userAgent.includes(app))
+}
 
 export default function LoginPage() {
-  const [username, setUsername] = useState("")
+  const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [showPassword, setShowPassword] = useState(false)
-  const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
-  const [acceptedTerms, setAcceptedTerms] = useState(false)
-  const [termsDialogOpen, setTermsDialogOpen] = useState(false)
-  const [contactDialogOpen, setContactDialogOpen] = useState(false)
-  const [contactType, setContactType] = useState<"whatsapp" | "telegram">("whatsapp")
-  const { login, isAuthenticated } = useAuth()
+  const [error, setError] = useState("")
+  const [mounted, setMounted] = useState(false)
+  const [showContactDialog, setShowContactDialog] = useState(false)
+  const [showTermsDialog, setShowTermsDialog] = useState(false)
+  const [termsAccepted, setTermsAccepted] = useState(false)
+  const [copiedPhone, setCopiedPhone] = useState(false)
+  const [copiedMessage, setCopiedMessage] = useState(false)
+  const [isRestricted, setIsRestricted] = useState(false)
+
+  const { login } = useAuth()
+  const { theme } = useTheme()
   const router = useRouter()
 
+  const phoneNumber = "+1 (555) 123-4567"
+  const whatsappMessage = "Hi, I'd like to access the Premium Deriv Analysis Tool for $85. Please help me get started."
+
   useEffect(() => {
-    if (isAuthenticated) {
-      router.push("/")
-    }
-  }, [isAuthenticated, router])
+    setMounted(true)
+    setIsRestricted(isRestrictedEnvironment())
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!acceptedTerms) {
-      setError("You must accept the Terms & Conditions to continue")
+    if (!termsAccepted) {
+      setError("Please accept the Terms and Conditions to continue")
+      return
+    }
+
+    if (!email || !password) {
+      setError("Please fill in all fields")
       return
     }
 
     setIsLoading(true)
     setError("")
 
-    const success = await login(username, password)
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      })
 
-    if (success) {
-      router.push("/")
-    } else {
-      setError("Invalid username or password")
+      const data = await response.json()
+
+      if (response.ok) {
+        login(data.user)
+        router.push("/analyzer")
+      } else {
+        setError(data.error || "Login failed")
+      }
+    } catch (error) {
+      setError("Network error. Please try again.")
+    } finally {
+      setIsLoading(false)
     }
-
-    setIsLoading(false)
   }
 
-  // Copy text to clipboard
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard
-      .writeText(text)
-      .then(() => {
-        toast.success("Copied to clipboard!")
-      })
-      .catch(() => {
-        toast.error("Failed to copy")
-      })
-  }
-
-  // Check if we're in TikTok or other restricted environment
-  const isRestrictedEnvironment = () => {
-    const userAgent = navigator.userAgent.toLowerCase()
-    return (
-      userAgent.includes("tiktok") ||
-      userAgent.includes("musically") ||
-      userAgent.includes("instagram") ||
-      userAgent.includes("facebook") ||
-      userAgent.includes("twitter")
-    )
-  }
-
-  // Enhanced WhatsApp function with fallback for restricted environments
-  const openWhatsApp = () => {
-    const phoneNumber = "+254 787 570246"
-    const message = "I would like to purchase deriv analysis tool logins"
-
-    if (isRestrictedEnvironment()) {
-      // Show contact dialog instead of trying to redirect
-      setContactType("whatsapp")
-      setContactDialogOpen(true)
+  const handleWhatsAppClick = () => {
+    if (isRestricted) {
+      setShowContactDialog(true)
       return
     }
 
-    // Try normal redirect for unrestricted environments
-    const whatsappUrl = `https://wa.me/254787570246?text=${encodeURIComponent(message)}`
-
-    try {
-      window.open(whatsappUrl, "_blank")
-    } catch (error) {
-      // Fallback to contact dialog if redirect fails
-      setContactType("whatsapp")
-      setContactDialogOpen(true)
-    }
+    const whatsappUrl = `https://wa.me/15551234567?text=${encodeURIComponent(whatsappMessage)}`
+    window.open(whatsappUrl, "_blank")
   }
 
-  // Enhanced Telegram function with fallback for restricted environments
-  const openTelegram = () => {
-    const phoneNumber = "+254 787 570246"
-    const message = "I would like to purchase deriv analysis tool logins"
-
-    if (isRestrictedEnvironment()) {
-      // Show contact dialog instead of trying to redirect
-      setContactType("telegram")
-      setContactDialogOpen(true)
+  const handleTelegramClick = () => {
+    if (isRestricted) {
+      setShowContactDialog(true)
       return
     }
 
-    // Try normal redirect for unrestricted environments
-    const telegramUrl = `https://t.me/+254787570246`
+    const telegramUrl = "https://t.me/DerivAnalysisTool"
+    window.open(telegramUrl, "_blank")
+  }
 
+  const copyToClipboard = async (text: string, type: "phone" | "message") => {
     try {
-      window.open(telegramUrl, "_blank")
-    } catch (error) {
-      // Fallback to contact dialog if redirect fails
-      setContactType("telegram")
-      setContactDialogOpen(true)
+      await navigator.clipboard.writeText(text)
+      if (type === "phone") {
+        setCopiedPhone(true)
+        setTimeout(() => setCopiedPhone(false), 2000)
+      } else {
+        setCopiedMessage(true)
+        setTimeout(() => setCopiedMessage(false), 2000)
+      }
+    } catch (err) {
+      console.error("Failed to copy:", err)
     }
   }
+
+  if (!mounted) return null
+
+  const isDark = theme === "dark"
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
+    <div
+      className={cn(
+        "min-h-screen flex items-center justify-center p-4 transition-colors duration-500",
+        isDark
+          ? "bg-gradient-to-br from-gray-900 via-purple-950 to-gray-900"
+          : "bg-gradient-to-br from-pink-50 via-purple-100 to-indigo-50",
+      )}
+    >
       <div className="w-full max-w-md space-y-6">
         {/* Header */}
-        <div className="text-center space-y-2">
+        <div className="text-center space-y-4">
           <div className="flex items-center justify-center gap-3 mb-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-red-500 to-red-600 rounded-xl flex items-center justify-center">
-              <TrendingUp className="h-6 w-6 text-white" />
+            <div className="relative">
+              <div
+                className={cn(
+                  "w-16 h-16 rounded-full flex items-center justify-center",
+                  isDark
+                    ? "bg-gradient-to-br from-purple-600 to-pink-600"
+                    : "bg-gradient-to-br from-purple-500 to-pink-500",
+                )}
+              >
+                <TrendingUp className="h-8 w-8 text-white" />
+              </div>
+              <div className="absolute -top-1 -right-1">
+                <Crown className="h-6 w-6 text-yellow-500" />
+              </div>
             </div>
-            <h1 className="text-3xl font-bold text-white">
-              <span className="text-red-500">D</span>analysis Tool
-            </h1>
+            <AmericanFlag className="w-8 h-6" />
           </div>
-          <p className="text-gray-300">Professional Trading Analysis Platform</p>
+
+          <h1
+            className={cn(
+              "text-4xl font-bold bg-gradient-to-r bg-clip-text text-transparent",
+              isDark ? "from-purple-400 via-pink-400 to-purple-400" : "from-purple-600 via-pink-600 to-purple-600",
+            )}
+          >
+            Deriv Analysis
+          </h1>
+          <p className={cn("text-lg", isDark ? "text-gray-300" : "text-gray-600")}>
+            Premium Trading Intelligence Platform
+          </p>
+
+          {/* Premium Badge */}
+          <div className="flex justify-center">
+            <Badge
+              className={cn(
+                "px-4 py-2 text-sm font-semibold",
+                "bg-gradient-to-r from-yellow-500 to-orange-500 text-white",
+                "shadow-lg shadow-yellow-500/25",
+              )}
+            >
+              <Crown className="h-4 w-4 mr-2" />
+              Premium Access - $85
+            </Badge>
+          </div>
         </div>
 
-        {/* Login Card */}
-        <Card className="shadow-xl border-white/20 bg-white/10 backdrop-blur-xl">
-          <CardHeader className="space-y-1 pb-4">
-            <CardTitle className="text-2xl font-semibold text-center text-white">Welcome Back</CardTitle>
-            <CardDescription className="text-center text-gray-300">
-              Sign in to access your trading dashboard
-            </CardDescription>
+        {/* Features Preview */}
+        <Card
+          className={cn(
+            "backdrop-blur-xl border transition-all duration-300",
+            isDark
+              ? "bg-gray-900/60 border-purple-500/20 hover:border-purple-500/40"
+              : "bg-white/80 border-purple-200/50 hover:border-purple-300/70",
+            "shadow-xl hover:shadow-2xl",
+          )}
+        >
+          <CardHeader className="pb-4">
+            <CardTitle className="text-center flex items-center justify-center gap-2">
+              <Zap className="h-5 w-5 text-yellow-500" />
+              Premium Features
+            </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="username" className="text-white">
-                  Username
-                </Label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="username"
-                    type="text"
-                    placeholder="Enter your username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    className="pl-10 h-11 bg-white/10 border-white/20 text-white placeholder:text-gray-400"
-                    required
-                  />
-                </div>
+          <CardContent className="space-y-3">
+            <div className="grid grid-cols-1 gap-3">
+              <div className="flex items-center gap-3 p-2 rounded-lg bg-gradient-to-r from-green-500/10 to-emerald-500/10">
+                <BarChart3 className="h-5 w-5 text-green-500" />
+                <span className="text-sm font-medium">Live Market Analysis</span>
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="password" className="text-white">
-                  Password
-                </Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="Enter your password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10 pr-10 h-11 bg-white/10 border-white/20 text-white placeholder:text-gray-400"
-                    required
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4 text-gray-400" />
-                    ) : (
-                      <Eye className="h-4 w-4 text-gray-400" />
-                    )}
-                  </Button>
-                </div>
+              <div className="flex items-center gap-3 p-2 rounded-lg bg-gradient-to-r from-blue-500/10 to-cyan-500/10">
+                <Target className="h-5 w-5 text-blue-500" />
+                <span className="text-sm font-medium">AI-Powered Predictions</span>
               </div>
-
-              {/* Terms and Conditions Checkbox */}
-              <div className="flex items-start space-x-3 py-2">
-                <Checkbox
-                  id="terms"
-                  checked={acceptedTerms}
-                  onCheckedChange={(checked) => setAcceptedTerms(checked as boolean)}
-                  className="border-white/30 data-[state=checked]:bg-purple-500 data-[state=checked]:border-purple-500"
-                />
-                <div className="grid gap-1.5 leading-none">
-                  <Label htmlFor="terms" className="text-sm font-medium leading-none text-white cursor-pointer">
-                    I agree to the{" "}
-                    <Dialog open={termsDialogOpen} onOpenChange={setTermsDialogOpen}>
-                      <DialogTrigger asChild>
-                        <button type="button" className="text-purple-400 hover:text-purple-300 underline inline">
-                          Terms & Conditions
-                        </button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-2xl max-h-[80vh] bg-slate-900 border-white/20 text-white">
-                        <DialogHeader>
-                          <DialogTitle className="flex items-center gap-2 text-xl font-bold text-purple-400">
-                            <FileText className="h-5 w-5" />
-                            Terms & Conditions for Deriv Analysis Tool Logins
-                          </DialogTitle>
-                          <DialogDescription className="text-gray-300">
-                            Last Updated: 11 September 2025
-                          </DialogDescription>
-                        </DialogHeader>
-                        <ScrollArea className="h-[60vh] pr-4">
-                          <div className="space-y-6 text-sm">
-                            <p className="text-gray-300">
-                              Welcome to DerivAnalysisTool.com. By creating an account and logging in, you agree to
-                              comply with and be bound by the following Terms & Conditions. Please read them carefully
-                              before using our service.
-                            </p>
-
-                            <div className="space-y-4">
-                              <div>
-                                <h3 className="text-lg font-semibold text-purple-400 mb-2">1. Acceptance of Terms</h3>
-                                <p className="text-gray-300">By registering or logging in, you confirm that you:</p>
-                                <ul className="list-disc list-inside mt-2 space-y-1 text-gray-300 ml-4">
-                                  <li>Are at least 18 years old.</li>
-                                  <li>Agree to these Terms & Conditions and our Privacy Policy.</li>
-                                  <li>Will use this tool only for lawful purposes.</li>
-                                </ul>
-                              </div>
-
-                              <div>
-                                <h3 className="text-lg font-semibold text-blue-400 mb-2">2. Account Responsibility</h3>
-                                <ul className="list-disc list-inside space-y-1 text-gray-300 ml-4">
-                                  <li>
-                                    You are responsible for maintaining the confidentiality of your login details
-                                    (username & password).
-                                  </li>
-                                  <li>You agree not to share, sell, or transfer your login credentials.</li>
-                                  <li>Any activity under your account will be considered your responsibility.</li>
-                                </ul>
-                              </div>
-
-                              <div>
-                                <h3 className="text-lg font-semibold text-green-400 mb-2">3. Use of the Tool</h3>
-                                <ul className="list-disc list-inside space-y-1 text-gray-300 ml-4">
-                                  <li>
-                                    The Deriv Analysis Tool provides market analysis and insights but does not guarantee
-                                    profits or prevent losses.
-                                  </li>
-                                  <li>Trading involves risk; you are solely responsible for your trading decisions.</li>
-                                  <li>
-                                    The tool must not be used for fraudulent activities, bots not approved by us, or any
-                                    illegal purpose.
-                                  </li>
-                                </ul>
-                              </div>
-
-                              <div>
-                                <h3 className="text-lg font-semibold text-yellow-400 mb-2">4. Login Access</h3>
-                                <ul className="list-disc list-inside space-y-1 text-gray-300 ml-4">
-                                  <li>
-                                    We reserve the right to suspend or terminate your account if we detect misuse,
-                                    sharing of credentials, or violation of these Terms.
-                                  </li>
-                                  <li>
-                                    Access may be limited or denied at any time without prior notice for security
-                                    reasons.
-                                  </li>
-                                </ul>
-                              </div>
-
-                              <div>
-                                <h3 className="text-lg font-semibold text-red-400 mb-2">5. Payments & Subscriptions</h3>
-                                <ul className="list-disc list-inside space-y-1 text-gray-300 ml-4">
-                                  <li>
-                                    If login access is subscription-based, you agree to pay all applicable fees on time.
-                                  </li>
-                                  <li>
-                                    No refunds will be issued once analysis access has been granted, unless required by
-                                    law.
-                                  </li>
-                                </ul>
-                              </div>
-
-                              <div>
-                                <h3 className="text-lg font-semibold text-orange-400 mb-2">
-                                  6. Limitation of Liability
-                                </h3>
-                                <ul className="list-disc list-inside space-y-1 text-gray-300 ml-4">
-                                  <li>
-                                    We are not responsible for any losses, damages, or liabilities resulting from the
-                                    use of this tool.
-                                  </li>
-                                  <li>
-                                    Analysis results are for educational and informational purposes only, not financial
-                                    advice.
-                                  </li>
-                                </ul>
-                              </div>
-
-                              <div>
-                                <h3 className="text-lg font-semibold text-pink-400 mb-2">7. Changes to Terms</h3>
-                                <p className="text-gray-300">
-                                  We may update these Terms & Conditions at any time. Continued use of the tool means
-                                  you accept any changes.
-                                </p>
-                              </div>
-
-                              <div>
-                                <h3 className="text-lg font-semibold text-cyan-400 mb-2">8. Contact Information</h3>
-                                <p className="text-gray-300 mb-2">
-                                  For any questions about these Terms & Conditions, please contact us at:
-                                </p>
-                                <div className="space-y-1 text-gray-300 ml-4">
-                                  <p>📧 Email: support@derivanalysistool.com</p>
-                                  <p>📞 Phone: +254 787 570246</p>
-                                  <p>🌐 Website: https://derivanalysistool.com</p>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </ScrollArea>
-                        <div className="flex justify-end pt-4">
-                          <Button
-                            onClick={() => {
-                              setAcceptedTerms(true)
-                              setTermsDialogOpen(false)
-                            }}
-                            className="bg-purple-600 hover:bg-purple-700"
-                          >
-                            Accept Terms
-                          </Button>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                  </Label>
-                  <p className="text-xs text-gray-400">You must accept our terms to create an account</p>
-                </div>
-              </div>
-
-              {error && (
-                <Alert variant="destructive" className="bg-red-500/10 border-red-500/20">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription className="text-red-400">{error}</AlertDescription>
-                </Alert>
-              )}
-
-              <Button
-                type="submit"
-                className="w-full h-11 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-medium disabled:opacity-50"
-                disabled={isLoading || !acceptedTerms}
-              >
-                {isLoading ? "Signing in..." : "Sign In"}
-              </Button>
-            </form>
-
-            <Separator className="my-6 bg-white/20" />
-
-            {/* Contact Section */}
-            <div className="space-y-4">
-              <div className="text-center">
-                <p className="text-sm text-gray-300 mb-4">Need login credentials? Contact us:</p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                {/* WhatsApp Button */}
-                <Button
-                  variant="outline"
-                  onClick={openWhatsApp}
-                  className="flex items-center justify-center gap-2 h-11 border-green-500/30 hover:bg-green-500/10 hover:border-green-500/50 transition-all bg-transparent text-green-400"
-                >
-                  <MessageCircle className="h-4 w-4" />
-                  <span className="font-medium">WhatsApp</span>
-                </Button>
-
-                {/* Telegram Button */}
-                <Button
-                  variant="outline"
-                  onClick={openTelegram}
-                  className="flex items-center justify-center gap-2 h-11 border-blue-500/30 hover:bg-blue-500/10 hover:border-blue-500/50 transition-all bg-transparent text-blue-400"
-                >
-                  <Send className="h-4 w-4" />
-                  <span className="font-medium">Telegram</span>
-                </Button>
-              </div>
-
-              <div className="text-center">
-                <p className="text-xs text-gray-400">Contact us for support, account issues, or trading assistance</p>
-              </div>
-            </div>
-
-            {/* Pricing Info */}
-            <div className="mt-6 p-4 bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/30 rounded-lg">
-              <div className="text-center">
-                <p className="text-green-400 font-semibold text-lg">Premium Access - $85</p>
-                <p className="text-xs text-gray-300 mt-1">Get instant login credentials and full platform access</p>
+              <div className="flex items-center gap-3 p-2 rounded-lg bg-gradient-to-r from-purple-500/10 to-pink-500/10">
+                <TrendingUp className="h-5 w-5 text-purple-500" />
+                <span className="text-sm font-medium">Advanced Trading Signals</span>
               </div>
             </div>
           </CardContent>
         </Card>
 
+        {/* Login Form */}
+        <Card
+          className={cn(
+            "backdrop-blur-xl border transition-all duration-300",
+            isDark
+              ? "bg-gray-900/60 border-purple-500/20 hover:border-purple-500/40"
+              : "bg-white/80 border-purple-200/50 hover:border-purple-300/70",
+            "shadow-xl hover:shadow-2xl",
+          )}
+        >
+          <CardHeader>
+            <CardTitle className="text-center">Access Premium Platform</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Input
+                  type="email"
+                  placeholder="Email address"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className={cn(
+                    "h-12 transition-all duration-300",
+                    isDark
+                      ? "bg-gray-800/50 border-purple-500/30 focus:border-purple-400"
+                      : "bg-white/70 border-purple-300/50 focus:border-purple-500",
+                  )}
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Input
+                  type="password"
+                  placeholder="Password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className={cn(
+                    "h-12 transition-all duration-300",
+                    isDark
+                      ? "bg-gray-800/50 border-purple-500/30 focus:border-purple-400"
+                      : "bg-white/70 border-purple-300/50 focus:border-purple-500",
+                  )}
+                  required
+                />
+              </div>
+
+              {/* Terms and Conditions */}
+              <div className="flex items-start space-x-3 p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                <Checkbox
+                  id="terms"
+                  checked={termsAccepted}
+                  onCheckedChange={(checked) => setTermsAccepted(checked as boolean)}
+                  className="mt-1"
+                />
+                <div className="space-y-1">
+                  <label htmlFor="terms" className="text-sm font-medium cursor-pointer">
+                    I agree to the{" "}
+                    <Dialog open={showTermsDialog} onOpenChange={setShowTermsDialog}>
+                      <DialogTrigger asChild>
+                        <button type="button" className="text-purple-600 hover:text-purple-700 underline font-semibold">
+                          Terms and Conditions
+                        </button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-4xl max-h-[80vh]">
+                        <DialogHeader>
+                          <DialogTitle className="flex items-center gap-2">
+                            <FileText className="h-5 w-5" />
+                            Terms and Conditions
+                          </DialogTitle>
+                        </DialogHeader>
+                        <ScrollArea className="h-[60vh] pr-4">
+                          <div className="space-y-6 text-sm">
+                            {/* Terms content */}
+                            <section>
+                              <h3 className="font-semibold text-lg mb-3 text-purple-600">1. Acceptance of Terms</h3>
+                              <p className="mb-3">
+                                By accessing and using the Deriv Analysis Tool ("Service"), you accept and agree to be
+                                bound by the terms and provision of this agreement.
+                              </p>
+                            </section>
+
+                            <Separator />
+
+                            <section>
+                              <h3 className="font-semibold text-lg mb-3 text-blue-600">2. Service Description</h3>
+                              <p className="mb-3">
+                                Our Service provides advanced trading analysis tools, market predictions, and trading
+                                signals for educational and informational purposes. The Service includes:
+                              </p>
+                              <ul className="list-disc pl-6 space-y-1">
+                                <li>Real-time market data analysis</li>
+                                <li>AI-powered trading predictions</li>
+                                <li>Advanced chart analysis tools</li>
+                                <li>Trading pattern recognition</li>
+                                <li>Risk assessment indicators</li>
+                              </ul>
+                            </section>
+
+                            <Separator />
+
+                            <section>
+                              <h3 className="font-semibold text-lg mb-3 text-red-600">3. Risk Disclaimer</h3>
+                              <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg border border-red-200 dark:border-red-800">
+                                <p className="font-semibold text-red-700 dark:text-red-400 mb-2">
+                                  ⚠️ IMPORTANT RISK WARNING
+                                </p>
+                                <p className="mb-3">
+                                  Trading involves substantial risk and may result in the loss of your invested capital.
+                                  You should not invest money that you cannot afford to lose. Before deciding to trade,
+                                  you should carefully consider your investment objectives, level of experience, and
+                                  risk appetite.
+                                </p>
+                                <ul className="list-disc pl-6 space-y-1">
+                                  <li>Past performance is not indicative of future results</li>
+                                  <li>Our predictions and signals are not guaranteed to be accurate</li>
+                                  <li>You are solely responsible for your trading decisions</li>
+                                  <li>We do not provide financial advice</li>
+                                </ul>
+                              </div>
+                            </section>
+
+                            <Separator />
+
+                            <section>
+                              <h3 className="font-semibold text-lg mb-3 text-green-600">4. Payment Terms</h3>
+                              <p className="mb-3">
+                                Access to our premium features requires a one-time payment of $85 USD. Payment terms:
+                              </p>
+                              <ul className="list-disc pl-6 space-y-1">
+                                <li>Payment is required before accessing premium features</li>
+                                <li>All payments are processed securely</li>
+                                <li>Refunds may be available within 7 days of purchase</li>
+                                <li>Prices are subject to change without notice</li>
+                              </ul>
+                            </section>
+
+                            <Separator />
+
+                            <section>
+                              <h3 className="font-semibold text-lg mb-3 text-purple-600">5. User Responsibilities</h3>
+                              <p className="mb-3">As a user of our Service, you agree to:</p>
+                              <ul className="list-disc pl-6 space-y-1">
+                                <li>Use the Service only for lawful purposes</li>
+                                <li>Not share your account credentials with others</li>
+                                <li>Not attempt to reverse engineer or copy our algorithms</li>
+                                <li>Comply with all applicable laws and regulations</li>
+                                <li>Use the information provided for educational purposes only</li>
+                              </ul>
+                            </section>
+
+                            <Separator />
+
+                            <section>
+                              <h3 className="font-semibold text-lg mb-3 text-orange-600">6. Privacy Policy</h3>
+                              <p className="mb-3">
+                                We are committed to protecting your privacy. Our privacy practices include:
+                              </p>
+                              <ul className="list-disc pl-6 space-y-1">
+                                <li>We collect only necessary information to provide our Service</li>
+                                <li>Your personal data is encrypted and stored securely</li>
+                                <li>We do not sell or share your data with third parties</li>
+                                <li>You can request deletion of your data at any time</li>
+                              </ul>
+                            </section>
+
+                            <Separator />
+
+                            <section>
+                              <h3 className="font-semibold text-lg mb-3 text-indigo-600">7. Limitation of Liability</h3>
+                              <p className="mb-3">
+                                To the maximum extent permitted by law, we shall not be liable for any indirect,
+                                incidental, special, consequential, or punitive damages, including without limitation,
+                                loss of profits, data, use, goodwill, or other intangible losses.
+                              </p>
+                            </section>
+
+                            <Separator />
+
+                            <section>
+                              <h3 className="font-semibold text-lg mb-3 text-teal-600">8. Contact Information</h3>
+                              <p className="mb-3">
+                                If you have any questions about these Terms and Conditions, please contact us:
+                              </p>
+                              <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+                                <p>
+                                  <strong>Email:</strong> support@derivanalysis.com
+                                </p>
+                                <p>
+                                  <strong>Phone:</strong> +1 (555) 123-4567
+                                </p>
+                                <p>
+                                  <strong>Address:</strong> 123 Trading Street, Financial District, NY 10001
+                                </p>
+                              </div>
+                            </section>
+
+                            <Separator />
+
+                            <section>
+                              <h3 className="font-semibold text-lg mb-3 text-gray-600">9. Changes to Terms</h3>
+                              <p className="mb-3">
+                                We reserve the right to modify these terms at any time. Changes will be effective
+                                immediately upon posting. Your continued use of the Service after changes constitutes
+                                acceptance of the new terms.
+                              </p>
+                            </section>
+
+                            <div className="mt-8 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                              <p className="text-sm text-blue-700 dark:text-blue-400">
+                                <strong>Last Updated:</strong> {new Date().toLocaleDateString()}
+                              </p>
+                              <p className="text-sm text-blue-700 dark:text-blue-400 mt-1">
+                                By using our Service, you acknowledge that you have read, understood, and agree to be
+                                bound by these Terms and Conditions.
+                              </p>
+                            </div>
+                          </div>
+                        </ScrollArea>
+                      </DialogContent>
+                    </Dialog>
+                  </label>
+                  <p className="text-xs text-gray-500">Required to access the premium platform</p>
+                </div>
+              </div>
+
+              {error && (
+                <Alert className="border-red-200 bg-red-50 dark:bg-red-900/20">
+                  <AlertTriangle className="h-4 w-4 text-red-600" />
+                  <AlertDescription className="text-red-700 dark:text-red-400">{error}</AlertDescription>
+                </Alert>
+              )}
+
+              <Button
+                type="submit"
+                disabled={isLoading || !termsAccepted}
+                className={cn(
+                  "w-full h-12 text-lg font-semibold transition-all duration-300",
+                  "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700",
+                  "shadow-lg hover:shadow-xl transform hover:scale-[1.02]",
+                  "disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none",
+                )}
+              >
+                {isLoading ? (
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Signing In...
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Lock className="h-5 w-5" />
+                    Access Premium Platform
+                  </div>
+                )}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        {/* Contact Options */}
+        <Card
+          className={cn(
+            "backdrop-blur-xl border transition-all duration-300",
+            isDark
+              ? "bg-gray-900/60 border-purple-500/20 hover:border-purple-500/40"
+              : "bg-white/80 border-purple-200/50 hover:border-purple-300/70",
+            "shadow-xl hover:shadow-2xl",
+          )}
+        >
+          <CardHeader>
+            <CardTitle className="text-center flex items-center justify-center gap-2">
+              <Users className="h-5 w-5" />
+              Need Help? Contact Us
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {isRestricted && (
+              <Alert className="border-yellow-200 bg-yellow-50 dark:bg-yellow-900/20">
+                <Info className="h-4 w-4 text-yellow-600" />
+                <AlertDescription className="text-yellow-700 dark:text-yellow-400">
+                  Direct links may not work in this app. Use the contact information below to reach us.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Button
+                onClick={handleWhatsAppClick}
+                className={cn(
+                  "h-12 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800",
+                  "shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-300",
+                )}
+              >
+                <MessageCircle className="h-5 w-5 mr-2" />
+                WhatsApp
+                {!isRestricted && <ExternalLink className="h-4 w-4 ml-2" />}
+              </Button>
+
+              <Button
+                onClick={handleTelegramClick}
+                className={cn(
+                  "h-12 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800",
+                  "shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-300",
+                )}
+              >
+                <MessageCircle className="h-5 w-5 mr-2" />
+                Telegram
+                {!isRestricted && <ExternalLink className="h-4 w-4 ml-2" />}
+              </Button>
+            </div>
+
+            <div className="text-center">
+              <p className="text-sm text-gray-500 mb-2">Or call us directly:</p>
+              <div className="flex items-center justify-center gap-2">
+                <Phone className="h-4 w-4 text-gray-500" />
+                <span className="font-mono text-lg">{phoneNumber}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Contact Dialog */}
+        <Dialog open={showContactDialog} onOpenChange={setShowContactDialog}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Phone className="h-5 w-5" />
+                Contact Information
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-900/20">
+                <Info className="h-4 w-4 text-blue-600" />
+                <AlertDescription className="text-blue-700 dark:text-blue-400">
+                  Since direct links don't work in this app, please use the information below to contact us.
+                </AlertDescription>
+              </Alert>
+
+              <div className="space-y-4">
+                <div className="p-4 rounded-lg border bg-gray-50 dark:bg-gray-800">
+                  <h4 className="font-semibold mb-2 flex items-center gap-2">
+                    <Phone className="h-4 w-4" />
+                    Phone Number
+                  </h4>
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono">{phoneNumber}</span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => copyToClipboard(phoneNumber, "phone")}
+                      className="h-8"
+                    >
+                      {copiedPhone ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-lg border bg-gray-50 dark:bg-gray-800">
+                  <h4 className="font-semibold mb-2 flex items-center gap-2">
+                    <MessageCircle className="h-4 w-4" />
+                    Message Template
+                  </h4>
+                  <div className="space-y-2">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">{whatsappMessage}</p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => copyToClipboard(whatsappMessage, "message")}
+                      className="w-full h-8"
+                    >
+                      {copiedMessage ? (
+                        <>
+                          <Check className="h-4 w-4 mr-2" />
+                          Copied!
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-4 w-4 mr-2" />
+                          Copy Message
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="text-center text-sm text-gray-500">
+                  <p>Steps to contact us:</p>
+                  <ol className="list-decimal list-inside mt-2 space-y-1">
+                    <li>Copy the phone number above</li>
+                    <li>Open WhatsApp or your phone app</li>
+                    <li>Paste the number and send the message</li>
+                  </ol>
+                </div>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
         {/* Footer */}
-        <div className="text-center text-sm text-gray-400">
-          <p>© 2024 Deriv Analysis Platform. All rights reserved.</p>
+        <div className="text-center text-sm text-gray-500 space-y-2">
+          <div className="flex items-center justify-center gap-4">
+            <div className="flex items-center gap-1">
+              <Shield className="h-4 w-4" />
+              <span>Secure</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Globe className="h-4 w-4" />
+              <span>Global</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <CreditCard className="h-4 w-4" />
+              <span>Trusted</span>
+            </div>
+          </div>
+          <p>© 2025 Deriv Analysis Tool. All rights reserved.</p>
         </div>
       </div>
-
-      {/* Contact Information Dialog */}
-      <Dialog open={contactDialogOpen} onOpenChange={setContactDialogOpen}>
-        <DialogContent className="max-w-md bg-slate-900 border-white/20 text-white">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-xl font-bold">
-              {contactType === "whatsapp" ? (
-                <>
-                  <MessageCircle className="h-5 w-5 text-green-400" />
-                  <span className="text-green-400">WhatsApp Contact</span>
-                </>
-              ) : (
-                <>
-                  <Send className="h-5 w-5 text-blue-400" />
-                  <span className="text-blue-400">Telegram Contact</span>
-                </>
-              )}
-            </DialogTitle>
-            <DialogDescription className="text-gray-300">
-              {isRestrictedEnvironment()
-                ? "External links are blocked in this app. Please copy the contact details below:"
-                : "Contact us directly using the information below:"}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            {/* Phone Number */}
-            <div className="space-y-2">
-              <Label className="text-sm font-medium text-gray-300">Phone Number:</Label>
-              <div className="flex items-center gap-2 p-3 bg-white/5 rounded-lg border border-white/10">
-                <span className="text-white font-mono">+254 787 570246</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => copyToClipboard("+254 787 570246")}
-                  className="ml-auto h-8 w-8 p-0 hover:bg-white/10"
-                >
-                  <Copy className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-
-            {/* Message */}
-            <div className="space-y-2">
-              <Label className="text-sm font-medium text-gray-300">Message to send:</Label>
-              <div className="flex items-start gap-2 p-3 bg-white/5 rounded-lg border border-white/10">
-                <span className="text-white text-sm flex-1">I would like to purchase deriv analysis tool logins</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => copyToClipboard("I would like to purchase deriv analysis tool logins")}
-                  className="h-8 w-8 p-0 hover:bg-white/10 flex-shrink-0"
-                >
-                  <Copy className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-
-            {/* Instructions */}
-            <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-              <p className="text-sm text-blue-300">
-                <strong>Instructions:</strong>
-              </p>
-              <ol className="text-sm text-gray-300 mt-2 space-y-1 list-decimal list-inside">
-                <li>Copy the phone number above</li>
-                <li>Open {contactType === "whatsapp" ? "WhatsApp" : "Telegram"} on your device</li>
-                <li>Start a new chat with the copied number</li>
-                <li>Copy and send the message above</li>
-              </ol>
-            </div>
-
-            {/* Try Direct Link Button (for non-restricted environments) */}
-            {!isRestrictedEnvironment() && (
-              <div className="pt-2">
-                <Button
-                  onClick={() => {
-                    const url =
-                      contactType === "whatsapp"
-                        ? `https://wa.me/254787570246?text=${encodeURIComponent("I would like to purchase deriv analysis tool logins")}`
-                        : `https://t.me/+254787570246`
-                    window.open(url, "_blank")
-                    setContactDialogOpen(false)
-                  }}
-                  className={`w-full ${
-                    contactType === "whatsapp" ? "bg-green-600 hover:bg-green-700" : "bg-blue-600 hover:bg-blue-700"
-                  }`}
-                >
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  Open {contactType === "whatsapp" ? "WhatsApp" : "Telegram"}
-                </Button>
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
