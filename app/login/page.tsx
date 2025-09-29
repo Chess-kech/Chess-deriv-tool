@@ -10,7 +10,30 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Separator } from "@/components/ui/separator"
-import { Eye, EyeOff, Lock, User, AlertCircle, MessageCircle, Send, TrendingUp } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import {
+  Eye,
+  EyeOff,
+  Lock,
+  User,
+  AlertCircle,
+  MessageCircle,
+  Send,
+  TrendingUp,
+  FileText,
+  Copy,
+  ExternalLink,
+} from "lucide-react"
+import { toast } from "sonner"
 
 export default function LoginPage() {
   const [username, setUsername] = useState("")
@@ -18,6 +41,10 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [acceptedTerms, setAcceptedTerms] = useState(false)
+  const [termsDialogOpen, setTermsDialogOpen] = useState(false)
+  const [contactDialogOpen, setContactDialogOpen] = useState(false)
+  const [contactType, setContactType] = useState<"whatsapp" | "telegram">("whatsapp")
   const { login, isAuthenticated } = useAuth()
   const router = useRouter()
 
@@ -29,6 +56,12 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (!acceptedTerms) {
+      setError("You must accept the Terms & Conditions to continue")
+      return
+    }
+
     setIsLoading(true)
     setError("")
 
@@ -43,61 +76,75 @@ export default function LoginPage() {
     setIsLoading(false)
   }
 
-  // Function to open WhatsApp
+  // Copy text to clipboard
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        toast.success("Copied to clipboard!")
+      })
+      .catch(() => {
+        toast.error("Failed to copy")
+      })
+  }
+
+  // Check if we're in TikTok or other restricted environment
+  const isRestrictedEnvironment = () => {
+    const userAgent = navigator.userAgent.toLowerCase()
+    return (
+      userAgent.includes("tiktok") ||
+      userAgent.includes("musically") ||
+      userAgent.includes("instagram") ||
+      userAgent.includes("facebook") ||
+      userAgent.includes("twitter")
+    )
+  }
+
+  // Enhanced WhatsApp function with fallback for restricted environments
   const openWhatsApp = () => {
-    const phoneNumber = "254787570246"
-    const message = encodeURIComponent("Hi! I'm interested in your Deriv analysis tool and need login credentials.")
+    const phoneNumber = "+254 787 570246"
+    const message = "I would like to purchase deriv analysis tool logins"
 
-    // Try to open WhatsApp app first, fallback to web
-    const whatsappUrl = `https://wa.me/${phoneNumber}?text=${message}`
+    if (isRestrictedEnvironment()) {
+      // Show contact dialog instead of trying to redirect
+      setContactType("whatsapp")
+      setContactDialogOpen(true)
+      return
+    }
 
-    // For mobile devices, try the app protocol first
-    if (/Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-      const appUrl = `whatsapp://send?phone=${phoneNumber}&text=${message}`
+    // Try normal redirect for unrestricted environments
+    const whatsappUrl = `https://wa.me/254787570246?text=${encodeURIComponent(message)}`
 
-      // Try to open the app
-      const iframe = document.createElement("iframe")
-      iframe.style.display = "none"
-      iframe.src = appUrl
-      document.body.appendChild(iframe)
-
-      // Fallback to web version after a short delay
-      setTimeout(() => {
-        document.body.removeChild(iframe)
-        window.open(whatsappUrl, "_blank")
-      }, 1000)
-    } else {
-      // Desktop - open web version
+    try {
       window.open(whatsappUrl, "_blank")
+    } catch (error) {
+      // Fallback to contact dialog if redirect fails
+      setContactType("whatsapp")
+      setContactDialogOpen(true)
     }
   }
 
-  // Function to open Telegram
+  // Enhanced Telegram function with fallback for restricted environments
   const openTelegram = () => {
-    const telegramUsername = "+254787570246"
-    const message = encodeURIComponent("Hi! I'm interested in your Deriv analysis tool and need login credentials.")
+    const phoneNumber = "+254 787 570246"
+    const message = "I would like to purchase deriv analysis tool logins"
 
-    // Try to open Telegram app first, fallback to web
-    const telegramWebUrl = `https://t.me/${telegramUsername}?text=${message}`
+    if (isRestrictedEnvironment()) {
+      // Show contact dialog instead of trying to redirect
+      setContactType("telegram")
+      setContactDialogOpen(true)
+      return
+    }
 
-    // For mobile devices, try the app protocol first
-    if (/Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-      const appUrl = `tg://resolve?domain=${telegramUsername}&text=${message}`
+    // Try normal redirect for unrestricted environments
+    const telegramUrl = `https://t.me/+254787570246`
 
-      // Try to open the app
-      const iframe = document.createElement("iframe")
-      iframe.style.display = "none"
-      iframe.src = appUrl
-      document.body.appendChild(iframe)
-
-      // Fallback to web version after a short delay
-      setTimeout(() => {
-        document.body.removeChild(iframe)
-        window.open(telegramWebUrl, "_blank")
-      }, 1000)
-    } else {
-      // Desktop - open web version
-      window.open(telegramWebUrl, "_blank")
+    try {
+      window.open(telegramUrl, "_blank")
+    } catch (error) {
+      // Fallback to contact dialog if redirect fails
+      setContactType("telegram")
+      setContactDialogOpen(true)
     }
   }
 
@@ -176,6 +223,162 @@ export default function LoginPage() {
                 </div>
               </div>
 
+              {/* Terms and Conditions Checkbox */}
+              <div className="flex items-start space-x-3 py-2">
+                <Checkbox
+                  id="terms"
+                  checked={acceptedTerms}
+                  onCheckedChange={(checked) => setAcceptedTerms(checked as boolean)}
+                  className="border-white/30 data-[state=checked]:bg-purple-500 data-[state=checked]:border-purple-500"
+                />
+                <div className="grid gap-1.5 leading-none">
+                  <Label htmlFor="terms" className="text-sm font-medium leading-none text-white cursor-pointer">
+                    I agree to the{" "}
+                    <Dialog open={termsDialogOpen} onOpenChange={setTermsDialogOpen}>
+                      <DialogTrigger asChild>
+                        <button type="button" className="text-purple-400 hover:text-purple-300 underline inline">
+                          Terms & Conditions
+                        </button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-2xl max-h-[80vh] bg-slate-900 border-white/20 text-white">
+                        <DialogHeader>
+                          <DialogTitle className="flex items-center gap-2 text-xl font-bold text-purple-400">
+                            <FileText className="h-5 w-5" />
+                            Terms & Conditions for Deriv Analysis Tool Logins
+                          </DialogTitle>
+                          <DialogDescription className="text-gray-300">
+                            Last Updated: 11 September 2025
+                          </DialogDescription>
+                        </DialogHeader>
+                        <ScrollArea className="h-[60vh] pr-4">
+                          <div className="space-y-6 text-sm">
+                            <p className="text-gray-300">
+                              Welcome to DerivAnalysisTool.com. By creating an account and logging in, you agree to
+                              comply with and be bound by the following Terms & Conditions. Please read them carefully
+                              before using our service.
+                            </p>
+
+                            <div className="space-y-4">
+                              <div>
+                                <h3 className="text-lg font-semibold text-purple-400 mb-2">1. Acceptance of Terms</h3>
+                                <p className="text-gray-300">By registering or logging in, you confirm that you:</p>
+                                <ul className="list-disc list-inside mt-2 space-y-1 text-gray-300 ml-4">
+                                  <li>Are at least 18 years old.</li>
+                                  <li>Agree to these Terms & Conditions and our Privacy Policy.</li>
+                                  <li>Will use this tool only for lawful purposes.</li>
+                                </ul>
+                              </div>
+
+                              <div>
+                                <h3 className="text-lg font-semibold text-blue-400 mb-2">2. Account Responsibility</h3>
+                                <ul className="list-disc list-inside space-y-1 text-gray-300 ml-4">
+                                  <li>
+                                    You are responsible for maintaining the confidentiality of your login details
+                                    (username & password).
+                                  </li>
+                                  <li>You agree not to share, sell, or transfer your login credentials.</li>
+                                  <li>Any activity under your account will be considered your responsibility.</li>
+                                </ul>
+                              </div>
+
+                              <div>
+                                <h3 className="text-lg font-semibold text-green-400 mb-2">3. Use of the Tool</h3>
+                                <ul className="list-disc list-inside space-y-1 text-gray-300 ml-4">
+                                  <li>
+                                    The Deriv Analysis Tool provides market analysis and insights but does not guarantee
+                                    profits or prevent losses.
+                                  </li>
+                                  <li>Trading involves risk; you are solely responsible for your trading decisions.</li>
+                                  <li>
+                                    The tool must not be used for fraudulent activities, bots not approved by us, or any
+                                    illegal purpose.
+                                  </li>
+                                </ul>
+                              </div>
+
+                              <div>
+                                <h3 className="text-lg font-semibold text-yellow-400 mb-2">4. Login Access</h3>
+                                <ul className="list-disc list-inside space-y-1 text-gray-300 ml-4">
+                                  <li>
+                                    We reserve the right to suspend or terminate your account if we detect misuse,
+                                    sharing of credentials, or violation of these Terms.
+                                  </li>
+                                  <li>
+                                    Access may be limited or denied at any time without prior notice for security
+                                    reasons.
+                                  </li>
+                                </ul>
+                              </div>
+
+                              <div>
+                                <h3 className="text-lg font-semibold text-red-400 mb-2">5. Payments & Subscriptions</h3>
+                                <ul className="list-disc list-inside space-y-1 text-gray-300 ml-4">
+                                  <li>
+                                    If login access is subscription-based, you agree to pay all applicable fees on time.
+                                  </li>
+                                  <li>
+                                    No refunds will be issued once analysis access has been granted, unless required by
+                                    law.
+                                  </li>
+                                </ul>
+                              </div>
+
+                              <div>
+                                <h3 className="text-lg font-semibold text-orange-400 mb-2">
+                                  6. Limitation of Liability
+                                </h3>
+                                <ul className="list-disc list-inside space-y-1 text-gray-300 ml-4">
+                                  <li>
+                                    We are not responsible for any losses, damages, or liabilities resulting from the
+                                    use of this tool.
+                                  </li>
+                                  <li>
+                                    Analysis results are for educational and informational purposes only, not financial
+                                    advice.
+                                  </li>
+                                </ul>
+                              </div>
+
+                              <div>
+                                <h3 className="text-lg font-semibold text-pink-400 mb-2">7. Changes to Terms</h3>
+                                <p className="text-gray-300">
+                                  We may update these Terms & Conditions at any time. Continued use of the tool means
+                                  you accept any changes.
+                                </p>
+                              </div>
+
+                              <div>
+                                <h3 className="text-lg font-semibold text-cyan-400 mb-2">8. Contact Information</h3>
+                                <p className="text-gray-300 mb-2">
+                                  For any questions about these Terms & Conditions, please contact us at:
+                                </p>
+                                <div className="space-y-1 text-gray-300 ml-4">
+                                  <p>📧 Email: support@derivanalysistool.com</p>
+                                  <p>📞 Phone: +254 787 570246</p>
+                                  <p>🌐 Website: https://derivanalysistool.com</p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </ScrollArea>
+                        <div className="flex justify-end pt-4">
+                          <Button
+                            onClick={() => {
+                              setAcceptedTerms(true)
+                              setTermsDialogOpen(false)
+                            }}
+                            className="bg-purple-600 hover:bg-purple-700"
+                          >
+                            Accept Terms
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </Label>
+                  <p className="text-xs text-gray-400">You must accept our terms to create an account</p>
+                </div>
+              </div>
+
               {error && (
                 <Alert variant="destructive" className="bg-red-500/10 border-red-500/20">
                   <AlertCircle className="h-4 w-4" />
@@ -185,8 +388,8 @@ export default function LoginPage() {
 
               <Button
                 type="submit"
-                className="w-full h-11 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-medium"
-                disabled={isLoading}
+                className="w-full h-11 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-medium disabled:opacity-50"
+                disabled={isLoading || !acceptedTerms}
               >
                 {isLoading ? "Signing in..." : "Sign In"}
               </Button>
@@ -242,6 +445,101 @@ export default function LoginPage() {
           <p>© 2024 Deriv Analysis Platform. All rights reserved.</p>
         </div>
       </div>
+
+      {/* Contact Information Dialog */}
+      <Dialog open={contactDialogOpen} onOpenChange={setContactDialogOpen}>
+        <DialogContent className="max-w-md bg-slate-900 border-white/20 text-white">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-xl font-bold">
+              {contactType === "whatsapp" ? (
+                <>
+                  <MessageCircle className="h-5 w-5 text-green-400" />
+                  <span className="text-green-400">WhatsApp Contact</span>
+                </>
+              ) : (
+                <>
+                  <Send className="h-5 w-5 text-blue-400" />
+                  <span className="text-blue-400">Telegram Contact</span>
+                </>
+              )}
+            </DialogTitle>
+            <DialogDescription className="text-gray-300">
+              {isRestrictedEnvironment()
+                ? "External links are blocked in this app. Please copy the contact details below:"
+                : "Contact us directly using the information below:"}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Phone Number */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-gray-300">Phone Number:</Label>
+              <div className="flex items-center gap-2 p-3 bg-white/5 rounded-lg border border-white/10">
+                <span className="text-white font-mono">+254 787 570246</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => copyToClipboard("+254 787 570246")}
+                  className="ml-auto h-8 w-8 p-0 hover:bg-white/10"
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Message */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-gray-300">Message to send:</Label>
+              <div className="flex items-start gap-2 p-3 bg-white/5 rounded-lg border border-white/10">
+                <span className="text-white text-sm flex-1">I would like to purchase deriv analysis tool logins</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => copyToClipboard("I would like to purchase deriv analysis tool logins")}
+                  className="h-8 w-8 p-0 hover:bg-white/10 flex-shrink-0"
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Instructions */}
+            <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+              <p className="text-sm text-blue-300">
+                <strong>Instructions:</strong>
+              </p>
+              <ol className="text-sm text-gray-300 mt-2 space-y-1 list-decimal list-inside">
+                <li>Copy the phone number above</li>
+                <li>Open {contactType === "whatsapp" ? "WhatsApp" : "Telegram"} on your device</li>
+                <li>Start a new chat with the copied number</li>
+                <li>Copy and send the message above</li>
+              </ol>
+            </div>
+
+            {/* Try Direct Link Button (for non-restricted environments) */}
+            {!isRestrictedEnvironment() && (
+              <div className="pt-2">
+                <Button
+                  onClick={() => {
+                    const url =
+                      contactType === "whatsapp"
+                        ? `https://wa.me/254787570246?text=${encodeURIComponent("I would like to purchase deriv analysis tool logins")}`
+                        : `https://t.me/+254787570246`
+                    window.open(url, "_blank")
+                    setContactDialogOpen(false)
+                  }}
+                  className={`w-full ${
+                    contactType === "whatsapp" ? "bg-green-600 hover:bg-green-700" : "bg-blue-600 hover:bg-blue-700"
+                  }`}
+                >
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  Open {contactType === "whatsapp" ? "WhatsApp" : "Telegram"}
+                </Button>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
