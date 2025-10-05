@@ -285,8 +285,8 @@ export default function LoginPage() {
                                 <h3 className="text-lg font-semibold text-green-400 mb-2">3. Use of the Tool</h3>
                                 <ul className="list-disc list-inside space-y-1 text-gray-300 ml-4">
                                   <li>
-                                    The Deriv Analysis Tool provides market analysis and insights but does not guarantee
-                                    profits or prevent losses.
+                                    The Deriv Analysis Tool provides market analysis and insights 
+                              
                                   </li>
                                   <li>Trading involves risk; you are solely responsible for your trading decisions.</li>
                                   <li>
@@ -426,7 +426,7 @@ export default function LoginPage() {
               </div>
 
               <div className="text-center">
-                <p className="text-xs text-gray-400">Contact us for support, account issues, or trading assistance</p>
+                <p className="text-xs text-gray-400">Contact on +254787570246 us for support, account issues, or trading assistance</p>
               </div>
             </div>
 
